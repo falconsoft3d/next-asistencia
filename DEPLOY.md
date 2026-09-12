@@ -15,13 +15,32 @@ Docker. Sustituye los valores entre `<...>` por los tuyos:
 
 ```bash
 ssh <usuario>@<ip-servidor>
+```
 
-# Docker + plugin compose (Ubuntu/Debian)
+**Opción A — script oficial (recomendado, incluye el plugin `docker compose` v2):**
+
+```bash
 curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
+```
+
+**Opción B — paquetes de Ubuntu/Debian vía apt (si prefieres no usar `curl | sh`):**
+
+```bash
+apt update
+apt install -y docker.io docker-compose-v2
+systemctl enable --now docker
+```
+
+Si tu usuario **no** es `root`, añádelo al grupo `docker` para no tener que
+usar `sudo` en cada comando (si ya estás como `root`, sáltate esto):
+
+```bash
+usermod -aG docker $USER
 # cierra la sesión SSH y vuelve a entrar para que el grupo tenga efecto
 exit
 ```
+
+Verifica la instalación:
 
 ```bash
 ssh <usuario>@<ip-servidor>
