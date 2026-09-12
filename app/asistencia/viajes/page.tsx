@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, PageShell, Spinner, Subtitle, Title, inputClass } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
@@ -19,6 +20,7 @@ function daysBetween(start: string, end: string) {
 }
 
 export default function ViajesPage() {
+  const router = useRouter();
   const token = employeeAuth.getToken();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -200,6 +202,9 @@ export default function ViajesPage() {
 
         <Button onClick={handleSubmit} disabled={submitting}>
           {submitting ? "Registrando…" : "Registrar Viaje"}
+        </Button>
+        <Button variant="secondary" onClick={() => router.push("/asistencia/entrar")}>
+          Ir a Inicio
         </Button>
       </Card>
     </PageShell>

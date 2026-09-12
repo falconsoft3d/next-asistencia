@@ -105,7 +105,9 @@ export default function PartnerEntrarPage() {
 
         {error ? <Alert type="error">{error}</Alert> : null}
 
-        <GeoGate disabled={!projectId} disabledHint="Selecciona un proyecto para continuar" onVerify={verifyPosition} />
+        {!geoVerified ? (
+          <GeoGate disabled={!projectId} disabledHint="Selecciona un proyecto para continuar" onVerify={verifyPosition} />
+        ) : null}
 
         {geoVerified ? (
           <Button onClick={handleCheckin} disabled={submitting}>

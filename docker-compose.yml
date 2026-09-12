@@ -1,0 +1,12 @@
+services:
+  next-asistencia:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_ODOO_API_URL: ${NEXT_PUBLIC_ODOO_API_URL:-http://localhost:8069}
+    image: next-asistencia:latest
+    container_name: next-asistencia
+    ports:
+      - "3000:3000"
+    restart: unless-stopped

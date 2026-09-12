@@ -46,7 +46,14 @@ export function ParteDiarioForm({ workedHours, budgets, products, fetchObjetivo,
   const totalPct = lines.reduce((sum, l) => sum + (Number(l.percentage) || 0), 0);
   const pctOk = Math.abs(totalPct - 100) < 0.01;
   const hasLineData = lines.some((l) => l.productId !== "");
-  const canSubmit = !!budgetId && hasLineData && pctOk && notas.trim().length > 0 && !submitting;
+  const hasNotas = notas.trim().length > 0;
+  const canSubmit = !!budgetId && hasLineData && pctOk && hasNotas && !submitting;
+
+  const validationMessages = [
+    !hasNotas && "Te falta ponerle una nota",
+    !pctOk && "El total debe ser el 100%",
+    !hasLineData && "Debes al menos llenar una línea",
+  ].filter((msg): msg is string => !!msg);
 
   function updateLine(key: string, patch: Partial<Line>) {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -184,6 +191,14 @@ export function ParteDiarioForm({ workedHours, budgets, products, fetchObjetivo,
       <Button onClick={handleSubmit} disabled={!canSubmit}>
         {submitting ? "Registrando…" : "Registrar"}
       </Button>
+
+      {validationMessages.length > 0 ? (
+        <ul className="flex flex-col gap-1 text-xs text-red-600">
+          {validationMessages.map((msg) => (
+            <li key={msg}>{msg}</li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }

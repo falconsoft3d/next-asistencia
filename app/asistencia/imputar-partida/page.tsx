@@ -9,8 +9,6 @@ import type { Budget, ConceptNode, ImputarPartidaLine } from "@/lib/types";
 interface OptionsResponse {
   status: "ok";
   budgets: Budget[];
-  products: { id: number; name: string }[];
-  employees: string[];
   lines: ImputarPartidaLine[];
 }
 
@@ -79,10 +77,10 @@ export default function ImputarPartidaPage() {
   const [message, setMessage] = useState<string | null>(null);
 
   const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [products, setProducts] = useState<{ id: number; name: string }[]>([]);
-  const [employees, setEmployees] = useState<string[]>([]);
   const [lines, setLines] = useState<ImputarPartidaLine[]>([]);
 
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
   const [filterBudget, setFilterBudget] = useState<number | "">("");
   const [filterProduct, setFilterProduct] = useState<number | "">("");
   const [filterEmployee, setFilterEmployee] = useState("");
@@ -99,8 +97,6 @@ export default function ImputarPartidaPage() {
       .get<OptionsResponse>("/api/asistencia/imputar-partida/options", token)
       .then((res) => {
         setBudgets(res.budgets);
-        setProducts(res.products);
-        setEmployees(res.employees);
         setLines(res.lines);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Error de conexión"))
@@ -118,15 +114,62 @@ export default function ImputarPartidaPage() {
       .catch(() => setTree([]));
   }, [filterBudget, token]);
 
+  function matchesDateRange(line: ImputarPartidaLine) {
+    if (!filterDateFrom && !filterDateTo) return true;
+    const date = line.datetime ? line.datetime.slice(0, 10) : "";
+    if (!date) return false;
+    if (filterDateFrom && date < filterDateFrom) return false;
+    if (filterDateTo && date > filterDateTo) return false;
+    return true;
+  }
+
   const filteredLines = useMemo(() => {
     return lines.filter((line) => {
       if (filterBudget && line.budget_id !== filterBudget) return false;
       if (filterProduct && line.product_id !== filterProduct) return false;
       if (filterEmployee && line.employee_name !== filterEmployee) return false;
       if (hideWithConcept && line.concept_name) return false;
+      if (!matchesDateRange(line)) return false;
       return true;
     });
-  }, [lines, filterBudget, filterProduct, filterEmployee, hideWithConcept]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines, filterBudget, filterProduct, filterEmployee, hideWithConcept, filterDateFrom, filterDateTo]);
+
+  const productOptions = useMemo(() => {
+    const seen = new Map<number, string>();
+    lines.forEach((line) => {
+      if (filterBudget && line.budget_id !== filterBudget) return;
+      if (filterEmployee && line.employee_name !== filterEmployee) return;
+      if (hideWithConcept && line.concept_name) return;
+      if (!matchesDateRange(line)) return;
+      if (line.product_id && !seen.has(line.product_id)) seen.set(line.product_id, line.product_name);
+    });
+    return Array.from(seen, ([id, name]) => ({ id, name }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines, filterBudget, filterEmployee, hideWithConcept, filterDateFrom, filterDateTo]);
+
+  const employeeOptions = useMemo(() => {
+    const seen = new Set<string>();
+    lines.forEach((line) => {
+      if (filterBudget && line.budget_id !== filterBudget) return;
+      if (filterProduct && line.product_id !== filterProduct) return;
+      if (hideWithConcept && line.concept_name) return;
+      if (!matchesDateRange(line)) return;
+      if (line.employee_name) seen.add(line.employee_name);
+    });
+    return Array.from(seen).sort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines, filterBudget, filterProduct, hideWithConcept, filterDateFrom, filterDateTo]);
+
+  useEffect(() => {
+    if (filterProduct && !productOptions.some((p) => p.id === filterProduct)) setFilterProduct("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productOptions]);
+
+  useEffect(() => {
+    if (filterEmployee && !employeeOptions.includes(filterEmployee)) setFilterEmployee("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employeeOptions]);
 
   const visibleIds = new Set(filteredLines.map((l) => l.id));
   const allVisibleSelected = filteredLines.length > 0 && filteredLines.every((l) => selected.has(l.id));
@@ -186,6 +229,27 @@ export default function ImputarPartidaPage() {
           <Subtitle>Asigna partidas del presupuesto a líneas de parte</Subtitle>
         </div>
 
+        <div className="grid grid-cols-2 gap-2">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-slate-700">Desde</span>
+            <input
+              type="date"
+              className={inputClass}
+              value={filterDateFrom}
+              onChange={(e) => setFilterDateFrom(e.target.value)}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-slate-700">Hasta</span>
+            <input
+              type="date"
+              className={inputClass}
+              value={filterDateTo}
+              onChange={(e) => setFilterDateTo(e.target.value)}
+            />
+          </label>
+        </div>
+
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <select className={inputClass} value={filterBudget} onChange={(e) => setFilterBudget(Number(e.target.value) || "")}>
             <option value="">Presupuesto…</option>
@@ -197,7 +261,7 @@ export default function ImputarPartidaPage() {
           </select>
           <select className={inputClass} value={filterProduct} onChange={(e) => setFilterProduct(Number(e.target.value) || "")}>
             <option value="">Producto…</option>
-            {products.map((p) => (
+            {productOptions.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
@@ -205,7 +269,7 @@ export default function ImputarPartidaPage() {
           </select>
           <select className={inputClass} value={filterEmployee} onChange={(e) => setFilterEmployee(e.target.value)}>
             <option value="">Empleado…</option>
-            {employees.map((name) => (
+            {employeeOptions.map((name) => (
               <option key={name} value={name}>
                 {name}
               </option>
@@ -260,30 +324,35 @@ export default function ImputarPartidaPage() {
                   <input type="checkbox" checked={allVisibleSelected} onChange={toggleAll} />
                 </th>
                 <th className="py-1 pr-2">Fecha</th>
-                <th className="py-1 pr-2">Empleado</th>
-                <th className="py-1 pr-2">Presupuesto</th>
-                <th className="py-1 pr-2">Partida actual</th>
-                <th className="py-1 pr-2">Producto</th>
+                <th className="py-1 pr-2">Categoría</th>
                 <th className="py-1 text-right">Horas</th>
+                <th className="py-1 pr-2">Empleado</th>
+                <th className="py-1 pr-2">Partida actual</th>
+                <th className="py-1 pr-2">Presupuesto</th>
+                <th className="py-1 text-right">%</th>
               </tr>
             </thead>
             <tbody>
               {filteredLines.map((line) => (
-                <tr key={line.id} className="border-b border-slate-100">
+                <tr
+                  key={line.id}
+                  className={`border-b border-slate-100 ${line.concept_name ? "bg-green-100" : ""}`}
+                >
                   <td className="py-1 pr-2">
                     <input type="checkbox" checked={selected.has(line.id)} onChange={() => toggleOne(line.id)} />
                   </td>
                   <td className="py-1 pr-2">{line.datetime || "—"}</td>
-                  <td className="py-1 pr-2">{line.employee_name}</td>
-                  <td className="py-1 pr-2">{line.budget_name}</td>
-                  <td className="py-1 pr-2">{line.concept_name || "—"}</td>
                   <td className="py-1 pr-2">{line.product_name}</td>
                   <td className="py-1 text-right">{line.horas.toFixed(2)}</td>
+                  <td className="py-1 pr-2">{line.employee_name}</td>
+                  <td className="py-1 pr-2">{line.concept_name || "—"}</td>
+                  <td className="py-1 pr-2">{line.budget_name}</td>
+                  <td className="py-1 text-right">{line.percentage}</td>
                 </tr>
               ))}
               {filteredLines.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-4 text-center text-slate-400">
+                  <td colSpan={8} className="py-4 text-center text-slate-400">
                     Sin líneas
                   </td>
                 </tr>

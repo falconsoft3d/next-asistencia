@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AsistenciaNav } from "@/components/AsistenciaNav";
 import { GeoGate } from "@/components/GeoGate";
+import { ProjectCombobox } from "@/components/ProjectCombobox";
 import { Alert, Button, Card, PageShell, Spinner, Subtitle, Title, inputClass } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { employeeAuth } from "@/lib/storage";
@@ -32,7 +33,6 @@ export default function EntrarPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [companyId, setCompanyId] = useState<number | "">("");
-  const [search, setSearch] = useState("");
   const [projectId, setProjectId] = useState<number | "">("");
   const [mode, setMode] = useState<"directo" | "desplazamiento">("directo");
   const [geoVerified, setGeoVerified] = useState(false);
@@ -57,13 +57,8 @@ export default function EntrarPage() {
   }, [router, token]);
 
   const filteredProjects = useMemo(() => {
-    return projects.filter((p) => {
-      if (companyId && p.company_id !== companyId) return false;
-      if (!search) return true;
-      const label = `[${p.name}] ${p.nombre}`.toLowerCase();
-      return label.includes(search.toLowerCase());
-    });
-  }, [projects, companyId, search]);
+    return projects.filter((p) => !companyId || p.company_id === companyId);
+  }, [projects, companyId]);
 
   async function verifyPosition(latitude: number, longitude: number) {
     if (!projectId) throw new Error("Selecciona primero un proyecto");
@@ -121,31 +116,24 @@ export default function EntrarPage() {
                 ))}
               </select>
             ) : null}
-            <input
-              className={inputClass}
+            <ProjectCombobox
+              projects={filteredProjects}
+              value={projectId}
+              onChange={setProjectId}
               placeholder="Buscar proyecto…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
             />
-            <select className={inputClass} value={projectId} onChange={(e) => setProjectId(Number(e.target.value))}>
-              <option value="">Seleccionar…</option>
-              {filteredProjects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  [{p.name}] {p.nombre}
-                  {p.state ? ` [${p.state}]` : ""}
-                </option>
-              ))}
-            </select>
           </>
         ) : null}
 
         {error ? <Alert type="error">{error}</Alert> : null}
 
-        <GeoGate
-          disabled={!projectId}
-          disabledHint="Selecciona un proyecto para continuar"
-          onVerify={verifyPosition}
-        />
+        {!geoVerified ? (
+          <GeoGate
+            disabled={!projectId}
+            disabledHint="Selecciona un proyecto para continuar"
+            onVerify={verifyPosition}
+          />
+        ) : null}
 
         {geoVerified ? (
           <div className="flex flex-col gap-3">
@@ -167,7 +155,7 @@ export default function EntrarPage() {
                 Desplazamiento
               </label>
             </div>
-            <Button onClick={handleCheckin} disabled={submitting}>
+            <Button variant="success" onClick={handleCheckin} disabled={submitting}>
               {submitting ? "Registrando…" : "Entrar"}
             </Button>
           </div>
