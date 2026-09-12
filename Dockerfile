@@ -11,6 +11,9 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# public/ puede no existir en el checkout (git no versiona carpetas vacías);
+# nos aseguramos de que exista para que el COPY de la etapa runner no falle.
+RUN mkdir -p public
 
 # NEXT_PUBLIC_* se incrusta en el bundle en build-time, por eso se necesita
 # como build-arg y no solo como variable de entorno en runtime.
