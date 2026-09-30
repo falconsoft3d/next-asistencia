@@ -39,6 +39,37 @@ export const rememberedPartnerCode = {
   clear: () => write(PARTNER_REMEMBERED_CODE_KEY, null),
 };
 
+const SOLMAT_NOTES_KEY = "asistencia_solmat_notes";
+const SOLMAT_NOTES_MAX = 300;
+
+function readSolmatNotes(): string[] {
+  const raw = read(SOLMAT_NOTES_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((n) => typeof n === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+// Notas ya solicitadas en este dispositivo: sirven de sugerencia al teclear una nueva
+export const solmatNotes = {
+  get: readSolmatNotes,
+  add: (notes: string[]) => {
+    const merged: string[] = [];
+    const seen = new Set<string>();
+    for (const note of [...notes, ...readSolmatNotes()]) {
+      const clean = note.trim();
+      const id = clean.toLowerCase();
+      if (!clean || seen.has(id)) continue;
+      seen.add(id);
+      merged.push(clean);
+    }
+    write(SOLMAT_NOTES_KEY, JSON.stringify(merged.slice(0, SOLMAT_NOTES_MAX)));
+  },
+};
+
 const PARTE_DRAFT_KEY = "asistencia_parte_draft";
 const PARTE_DRAFT_PARTNER_KEY = "asistencia_parte_draft_partner";
 

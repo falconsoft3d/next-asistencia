@@ -5,11 +5,14 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, PageShell, Spinner, Subtitle, Title, inputClass } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { employeeAuth } from "@/lib/storage";
-import type { Project, Vehicle } from "@/lib/types";
+import type { Company, Project, Vehicle } from "@/lib/types";
 
 interface OptionsResponse {
   status: "ok";
   today: string;
+  // Opcionales: un servidor sin actualizar todavía no los envía
+  companies?: Company[];
+  default_company_id?: number | false;
   projects: Project[];
   vehicles: Vehicle[];
 }
@@ -27,6 +30,8 @@ export default function ViajesPage() {
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [companyId, setCompanyId] = useState<number | "">("");
   const [projects, setProjects] = useState<Project[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [dateStart, setDateStart] = useState("");
@@ -42,6 +47,9 @@ export default function ViajesPage() {
     api
       .get<OptionsResponse>("/api/asistencia/shipment/options", token)
       .then((res) => {
+        const companies = res.companies ?? [];
+        setCompanies(companies);
+        setCompanyId(res.default_company_id || companies[0]?.id || "");
         setProjects(res.projects);
         setVehicles(res.vehicles);
         setDateStart(res.today);
@@ -52,6 +60,11 @@ export default function ViajesPage() {
   }, [token]);
 
   const vehicle = vehicles.find((v) => v.id === vehicleId);
+
+  const companyProjects = useMemo(
+    () => projects.filter((p) => !companyId || p.company_id === companyId),
+    [projects, companyId]
+  );
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-filling from the newly selected vehicle's data
@@ -84,6 +97,7 @@ export default function ViajesPage() {
       await api.post(
         "/api/asistencia/shipment",
         {
+          company_id: companyId,
           vehicle_id: vehicleId,
           from_project_id: fromProject,
           to_project_id: toProject,
@@ -135,9 +149,26 @@ export default function ViajesPage() {
           </label>
         </div>
 
+        <select
+          className={inputClass}
+          aria-label="Compañía"
+          value={companyId}
+          onChange={(e) => {
+            setCompanyId(Number(e.target.value));
+            // Los proyectos dependen de la compañía
+            setFromProject("");
+            setToProject("");
+          }}
+        >
+          {companies.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
         <select className={inputClass} value={fromProject} onChange={(e) => setFromProject(Number(e.target.value))}>
           <option value="">ORIG…</option>
-          {projects.map((p) => (
+          {companyProjects.map((p) => (
             <option key={p.id} value={p.id}>
               [{p.name}] - {p.nombre}
             </option>
@@ -145,7 +176,7 @@ export default function ViajesPage() {
         </select>
         <select className={inputClass} value={toProject} onChange={(e) => setToProject(Number(e.target.value))}>
           <option value="">DEST…</option>
-          {projects.map((p) => (
+          {companyProjects.map((p) => (
             <option key={p.id} value={p.id}>
               [{p.name}] - {p.nombre}
             </option>

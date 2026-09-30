@@ -25,6 +25,111 @@ export interface Product {
   company_ids: number[];
 }
 
+export interface PurchaseOrderLine {
+  id: number;
+  name: string;
+  quantity: number;
+  qty_received: number;
+  uom: string;
+}
+
+export interface PurchaseOrder {
+  id: number;
+  name: string;
+  partner_name: string;
+  project_name: string;
+  state: string;
+  state_label: string;
+  date_order: string | false;
+  date_planned: string | false;
+  lines: PurchaseOrderLine[];
+}
+
+export interface SolmatLine {
+  id: number;
+  note: string;
+  product_name: string;
+  quantity: number;
+}
+
+export interface Solmat {
+  id: number;
+  name: string;
+  date: string | false;
+  project_name: string;
+  state: "draft" | "requested" | "done";
+  state_label: string;
+  purchase_order_name: string;
+  lines: SolmatLine[];
+}
+
+export interface PickingLine {
+  id: number;
+  name: string;
+  quantity: number;
+  demand: number;
+  uom: string;
+}
+
+export interface Picking {
+  id: number;
+  name: string;
+  type: "incoming" | "outgoing";
+  type_label: string;
+  partner_name: string;
+  project_name: string;
+  purchase_name: string;
+  origin: string;
+  scheduled_date: string | false;
+  state: string;
+  state_label: string;
+  editable: boolean;
+  supplier_reference: string;
+  line_count: number;
+  photo_count: number;
+  lines: PickingLine[];
+}
+
+export type PickingSummary = Omit<Picking, "lines" | "photo_count">;
+
+export interface PartnerAttendance {
+  id: number;
+  state: "draft" | "validated" | "invoiced";
+  state_label: string;
+  partner_name: string;
+  partner_parent_name: string;
+  project_name: string;
+  check_in: string;
+  check_out: string;
+  hours_of_rest: number;
+  tiempo_total_calculado: number;
+  editable: boolean;
+}
+
+export interface Certification {
+  id: number;
+  name: string;
+  budget_id: number;
+  budget_name: string;
+  project_name: string;
+  stage_name: string;
+  stage_date_start: string | false;
+  stage_date_stop: string | false;
+  state: string;
+  state_label: string;
+  editable: boolean;
+}
+
+export interface CertificationLine {
+  id: number;
+  chapter: string;
+  concept: string;
+  budget_qty: number;
+  qty_acc: number;
+  quantity_to_cert_o: number;
+  quantity_to_cert: number;
+}
+
 export interface OpenAttendance {
   id: number;
   project: Project;

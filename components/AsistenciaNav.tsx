@@ -16,10 +16,10 @@ export function AsistenciaNav({ showShipment }: { showShipment: boolean }) {
     <div className="grid w-full grid-cols-2 gap-2">
       {showShipment ? <NavLink href="/asistencia/viajes">Registrar Viajes</NavLink> : null}
       <NavLink
-        href="/asistencia/imputar-partida"
+        href="/asistencia/gestion"
         className="border-green-200! bg-green-600! text-white! hover:bg-green-700!"
       >
-        Imputar Partida
+        Gestión
       </NavLink>
       <NavLink href="/asistencia/asistencias">Ver Asistencias</NavLink>
       <NavLink href="/asistencia/vacaciones">Vacaciones</NavLink>

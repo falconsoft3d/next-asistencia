@@ -1,17 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AsistenciaNav } from "@/components/AsistenciaNav";
 import { GeoGate } from "@/components/GeoGate";
 import { Alert, Button, Card, PageShell, Spinner, Subtitle, Title, inputClass } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { employeeAuth, parteDraft } from "@/lib/storage";
-import type { Budget, Employee, Product, Project } from "@/lib/types";
+import type { Budget, Company, Employee, Product, Project } from "@/lib/types";
 
 interface OptionsResponse {
   status: "ok";
   open_attendance: { id: number; project: Project } | null;
+  // Opcional: un servidor sin actualizar todavía no lo envía
+  companies?: Company[];
   projects: Project[];
 }
 
@@ -37,6 +39,8 @@ export default function SalirPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [employee, setEmployee] = useState<Employee | null>(null);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [companyId, setCompanyId] = useState<number | "">("");
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState<number | "">("");
   const [geoVerified, setGeoVerified] = useState(false);
@@ -57,6 +61,10 @@ export default function SalirPage() {
           router.replace("/asistencia/entrar");
           return;
         }
+        const companies = options.companies ?? [];
+        setCompanies(companies);
+        // Se parte de la compañía y el proyecto con los que se fichó la entrada
+        setCompanyId(options.open_attendance.project.company_id || companies[0]?.id || "");
         setProjects(options.projects);
         setProjectId(options.open_attendance.project.id);
         setEmployee(me.employee);
@@ -64,6 +72,11 @@ export default function SalirPage() {
       .catch((err) => setError(err instanceof ApiError ? err.message : "Error de conexión"))
       .finally(() => setLoading(false));
   }, [router, token]);
+
+  const filteredProjects = useMemo(
+    () => projects.filter((p) => !companyId || p.company_id === companyId),
+    [projects, companyId]
+  );
 
   async function verifyPosition(latitude: number, longitude: number) {
     if (!projectId) throw new Error("Selecciona un proyecto");
@@ -104,14 +117,37 @@ export default function SalirPage() {
         </div>
 
         {!geoVerified ? (
-          <select className={inputClass} value={projectId} onChange={(e) => setProjectId(Number(e.target.value))}>
-            <option value="">Seleccionar…</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                [{p.name}] {p.nombre}
-              </option>
-            ))}
-          </select>
+          <>
+            <select
+              className={inputClass}
+              aria-label="Compañía"
+              value={companyId}
+              onChange={(e) => {
+                setCompanyId(Number(e.target.value));
+                // Los proyectos dependen de la compañía
+                setProjectId("");
+              }}
+            >
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <select
+              className={inputClass}
+              aria-label="Proyecto"
+              value={projectId}
+              onChange={(e) => setProjectId(Number(e.target.value) || "")}
+            >
+              <option value="">Seleccionar…</option>
+              {filteredProjects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  [{p.name}] {p.nombre}
+                </option>
+              ))}
+            </select>
+          </>
         ) : null}
 
         {error ? <Alert type="error">{error}</Alert> : null}
