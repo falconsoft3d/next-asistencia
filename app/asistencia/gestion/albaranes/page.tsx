@@ -23,25 +23,31 @@ type Scope = "ready" | "all";
 interface Filter {
   projectId: number | "";
   scope: Scope;
-  groupByPurchase: boolean;
 }
 
-// Se recuerda el filtro para no perderlo al volver del detalle
+// Se recuerdan el filtro y los pedidos desplegados para no perderlos al volver del detalle
 const FILTER_KEY = "asistencia_albaranes_filter";
+const EXPANDED_KEY = "asistencia_albaranes_expanded";
 
 function readFilter(): Filter {
-  const fallback: Filter = { projectId: "", scope: "ready", groupByPurchase: true };
+  const fallback: Filter = { projectId: "", scope: "ready" };
   if (typeof window === "undefined") return fallback;
   try {
     const saved = JSON.parse(window.sessionStorage.getItem(FILTER_KEY) || "null");
     if (!saved) return fallback;
-    return {
-      projectId: Number(saved.projectId) || "",
-      scope: saved.scope === "all" ? "all" : "ready",
-      groupByPurchase: saved.groupByPurchase !== false,
-    };
+    return { projectId: Number(saved.projectId) || "", scope: saved.scope === "all" ? "all" : "ready" };
   } catch {
     return fallback;
+  }
+}
+
+function readExpanded(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const saved = JSON.parse(window.sessionStorage.getItem(EXPANDED_KEY) || "[]");
+    return Array.isArray(saved) ? saved.filter((key): key is string => typeof key === "string") : [];
+  } catch {
+    return [];
   }
 }
 
@@ -85,7 +91,7 @@ function groupByPurchase(pickings: PickingSummary[]): PurchaseGroup[] {
   return withoutPurchase ? [...groups.values(), withoutPurchase] : [...groups.values()];
 }
 
-function PickingRow({ picking, showPurchase }: { picking: PickingSummary; showPurchase: boolean }) {
+function PickingRow({ picking }: { picking: PickingSummary }) {
   return (
     <Link
       href={`/asistencia/gestion/albaranes/${picking.id}`}
@@ -111,9 +117,6 @@ function PickingRow({ picking, showPurchase }: { picking: PickingSummary; showPu
         </div>
         <p className="truncate text-xs text-slate-600">{picking.partner_name || "—"}</p>
         <p className="truncate text-xs text-slate-500">{picking.project_name}</p>
-        {showPurchase && picking.purchase_name ? (
-          <p className="truncate text-xs text-slate-500">Pedido {picking.purchase_name}</p>
-        ) : null}
       </div>
       <div className="shrink-0 text-right text-xs text-slate-500">
         <p className="text-slate-800">{fmtDate(picking.scheduled_date)}</p>
@@ -137,6 +140,7 @@ export default function AlbaranesPage() {
   const [pickings, setPickings] = useState<PickingSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string[]>(readExpanded);
 
   useEffect(() => {
     api
@@ -172,6 +176,16 @@ export default function AlbaranesPage() {
 
   const groups = useMemo(() => groupByPurchase(pickings), [pickings]);
 
+  function toggleGroup(key: string) {
+    const next = expanded.includes(key) ? expanded.filter((k) => k !== key) : [...expanded, key];
+    try {
+      window.sessionStorage.setItem(EXPANDED_KEY, JSON.stringify(next));
+    } catch {
+      // sin almacenamiento solo se pierde el estado al volver
+    }
+    setExpanded(next);
+  }
+
   function changeFilter(changes: Partial<Filter>) {
     const next = { ...filter, ...changes };
     window.sessionStorage.setItem(FILTER_KEY, JSON.stringify(next));
@@ -187,7 +201,7 @@ export default function AlbaranesPage() {
           <Subtitle>Recepciones y devoluciones de tus proyectos</Subtitle>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_auto]">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
           <select
             className={inputClass}
             aria-label="Proyecto"
@@ -210,15 +224,6 @@ export default function AlbaranesPage() {
             <option value="ready">Preparados</option>
             <option value="all">Todos</option>
           </select>
-          <select
-            className={inputClass}
-            aria-label="Agrupar"
-            value={filter.groupByPurchase ? "purchase" : "none"}
-            onChange={(e) => changeFilter({ groupByPurchase: e.target.value === "purchase" })}
-          >
-            <option value="purchase">Por pedido</option>
-            <option value="none">Sin agrupar</option>
-          </select>
         </div>
 
         {error ? <Alert type="error">{error}</Alert> : null}
@@ -229,34 +234,45 @@ export default function AlbaranesPage() {
           </div>
         ) : (
           <ul className="flex flex-col divide-y divide-slate-100 rounded-lg border border-slate-200">
-            {filter.groupByPurchase
-              ? groups.map((group) => (
-                  <li key={group.key || "sin-pedido"}>
-                    <div className="flex items-baseline gap-2 bg-slate-50 px-3 py-1.5 text-xs">
+            {groups.map((group) => {
+              const key = group.key || "sin-pedido";
+              const isOpen = expanded.includes(key);
+              return (
+                <li key={key}>
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(key)}
+                    aria-expanded={isOpen}
+                    className="flex w-full items-center gap-2 bg-slate-50 px-3 py-2 text-left text-xs hover:bg-slate-100"
+                  >
+                    <span
+                      aria-hidden
+                      className={`text-slate-400 transition-transform ${isOpen ? "rotate-90" : ""}`}
+                    >
+                      ›
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
                       <span className="font-semibold text-slate-800">
                         {group.purchaseName ? `Pedido ${group.purchaseName}` : "Sin pedido"}
                       </span>
                       {group.purchaseName && group.partnerName ? (
-                        <span className="min-w-0 flex-1 truncate text-slate-600">{group.partnerName}</span>
-                      ) : (
-                        <span className="flex-1" />
-                      )}
-                      <span className="shrink-0 text-slate-400">{group.pickings.length}</span>
-                    </div>
+                        <span className="text-slate-600">{group.partnerName}</span>
+                      ) : null}
+                    </span>
+                    <span className="shrink-0 text-slate-400">{group.pickings.length}</span>
+                  </button>
+                  {isOpen ? (
                     <ul className="divide-y divide-slate-100">
                       {group.pickings.map((picking) => (
                         <li key={picking.id}>
-                          <PickingRow picking={picking} showPurchase={false} />
+                          <PickingRow picking={picking} />
                         </li>
                       ))}
                     </ul>
-                  </li>
-                ))
-              : pickings.map((picking) => (
-                  <li key={picking.id}>
-                    <PickingRow picking={picking} showPurchase />
-                  </li>
-                ))}
+                  ) : null}
+                </li>
+              );
+            })}
             {pickings.length === 0 && !error ? (
               <li className="px-3 py-4 text-center text-sm text-slate-400">Sin albaranes</li>
             ) : null}
