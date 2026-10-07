@@ -243,6 +243,7 @@ export interface ImputarPartidaLine {
   product_name: string;
   percentage: number;
   horas: number;
+  note: string;
 }
 
 export interface ConceptNode {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, PageShell, Spinner, Subtitle, Title, inputClass } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { employeeAuth } from "@/lib/storage";
@@ -386,21 +386,30 @@ export default function ImputarPartidaPage() {
             </thead>
             <tbody>
               {filteredLines.map((line) => (
-                <tr
-                  key={line.id}
-                  className={`border-b border-slate-100 ${line.concept_name ? "bg-green-100" : ""}`}
-                >
-                  <td className="py-1 pr-2">
-                    <input type="checkbox" checked={selected.has(line.id)} onChange={() => toggleOne(line.id)} />
-                  </td>
-                  <td className="py-1 pr-2">{line.datetime || "—"}</td>
-                  <td className="py-1 pr-2">{line.product_name}</td>
-                  <td className="py-1 text-right">{line.horas.toFixed(2)}</td>
-                  <td className="py-1 pr-2">{line.employee_name}</td>
-                  <td className="py-1 pr-2">{line.concept_name || "—"}</td>
-                  <td className="py-1 pr-2">{line.budget_name}</td>
-                  <td className="py-1 text-right">{line.percentage}</td>
-                </tr>
+                <Fragment key={line.id}>
+                  <tr
+                    className={`${line.note ? "" : "border-b border-slate-100"} ${line.concept_name ? "bg-green-100" : ""}`}
+                  >
+                    <td className="py-1 pr-2">
+                      <input type="checkbox" checked={selected.has(line.id)} onChange={() => toggleOne(line.id)} />
+                    </td>
+                    <td className="py-1 pr-2">{line.datetime || "—"}</td>
+                    <td className="py-1 pr-2">{line.product_name}</td>
+                    <td className="py-1 text-right">{line.horas.toFixed(2)}</td>
+                    <td className="py-1 pr-2">{line.employee_name}</td>
+                    <td className="py-1 pr-2">{line.concept_name || "—"}</td>
+                    <td className="py-1 pr-2">{line.budget_name}</td>
+                    <td className="py-1 text-right">{line.percentage}</td>
+                  </tr>
+                  {line.note ? (
+                    <tr className={`border-b border-slate-100 ${line.concept_name ? "bg-green-100" : ""}`}>
+                      <td />
+                      <td colSpan={7} className="pb-1 pr-2 text-xs italic text-slate-500">
+                        {line.note}
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               ))}
               {filteredLines.length === 0 ? (
                 <tr>
