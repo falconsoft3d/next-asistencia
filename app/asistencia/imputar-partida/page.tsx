@@ -70,6 +70,34 @@ function ConceptTree({
   );
 }
 
+// Fecha local en formato YYYY-MM-DD (toISOString usaría UTC y podría cambiar de día)
+function isoDate(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+type DatePreset = "today" | "week" | "month";
+
+const DATE_PRESETS: { key: DatePreset; label: string }[] = [
+  { key: "today", label: "Hoy" },
+  { key: "week", label: "Semana" },
+  { key: "month", label: "Mes" },
+];
+
+function presetRange(preset: DatePreset): [string, string] {
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = today.getMonth();
+  const d = today.getDate();
+  if (preset === "week") {
+    // Semana de lunes a domingo
+    const offset = (today.getDay() + 6) % 7;
+    return [isoDate(new Date(y, m, d - offset)), isoDate(new Date(y, m, d - offset + 6))];
+  }
+  if (preset === "month") return [isoDate(new Date(y, m, 1)), isoDate(new Date(y, m + 1, 0))];
+  return [isoDate(today), isoDate(today)];
+}
+
 export default function ImputarPartidaPage() {
   const token = employeeAuth.getToken();
   const [loading, setLoading] = useState(true);
@@ -227,6 +255,30 @@ export default function ImputarPartidaPage() {
         <div className="flex flex-col gap-1">
           <Title>Imputar Partida</Title>
           <Subtitle>Asigna partidas del presupuesto a líneas de parte</Subtitle>
+        </div>
+
+        <div className="flex gap-2">
+          {DATE_PRESETS.map(({ key, label }) => {
+            const [from, to] = presetRange(key);
+            const active = filterDateFrom === from && filterDateTo === to;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => {
+                  setFilterDateFrom(from);
+                  setFilterDateTo(to);
+                }}
+                className={`flex-1 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                  active
+                    ? "border-blue-600 bg-blue-600 text-white"
+                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
 
         <div className="grid grid-cols-2 gap-2">
