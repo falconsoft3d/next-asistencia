@@ -181,6 +181,7 @@ export interface ParteLine {
   horas_efectivas: number;
   objective_qty: number;
   done_qty: number;
+  note: string;
 }
 
 export interface Parte {

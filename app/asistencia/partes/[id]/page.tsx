@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Alert, Card, PageShell, Spinner, Subtitle, Title } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { employeeAuth } from "@/lib/storage";
@@ -64,14 +64,23 @@ export default function VerPartePage() {
                 </thead>
                 <tbody>
                   {parte.lines.map((line, idx) => (
-                    <tr key={idx} className="border-b border-slate-100">
-                      <td className="py-1 pr-2">{line.concept_name || "—"}</td>
-                      <td className="py-1 pr-2">{line.product_name}</td>
-                      <td className="py-1 pr-2 text-right">{line.percentage.toFixed(2)}</td>
-                      <td className="py-1 pr-2 text-right">{line.horas_efectivas.toFixed(2)}</td>
-                      <td className="py-1 pr-2 text-right">{line.objective_qty}</td>
-                      <td className="py-1 text-right">{line.done_qty}</td>
-                    </tr>
+                    <Fragment key={idx}>
+                      <tr className={line.note ? "" : "border-b border-slate-100"}>
+                        <td className="py-1 pr-2">{line.concept_name || "—"}</td>
+                        <td className="py-1 pr-2">{line.product_name}</td>
+                        <td className="py-1 pr-2 text-right">{line.percentage.toFixed(2)}</td>
+                        <td className="py-1 pr-2 text-right">{line.horas_efectivas.toFixed(2)}</td>
+                        <td className="py-1 pr-2 text-right">{line.objective_qty}</td>
+                        <td className="py-1 text-right">{line.done_qty}</td>
+                      </tr>
+                      {line.note ? (
+                        <tr className="border-b border-slate-100">
+                          <td colSpan={6} className="pb-1 text-xs text-slate-500">
+                            {line.note}
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

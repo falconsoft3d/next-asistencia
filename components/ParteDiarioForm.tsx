@@ -10,10 +10,18 @@ interface Line {
   percentage: number;
   doneQty: number;
   objetivo: number | null;
+  note: string;
 }
 
 function newLine(): Line {
-  return { key: Math.random().toString(36).slice(2), productId: "", percentage: 0, doneQty: 0, objetivo: null };
+  return {
+    key: Math.random().toString(36).slice(2),
+    productId: "",
+    percentage: 0,
+    doneQty: 0,
+    objetivo: null,
+    note: "",
+  };
 }
 
 interface ParteDiarioFormProps {
@@ -23,14 +31,12 @@ interface ParteDiarioFormProps {
   fetchObjetivo: (budgetId: number, productId: number) => Promise<number>;
   onSubmit: (payload: {
     budget_id: number | null;
-    notas: string;
-    lines: { product_id: number; percentage: number; done_qty: number }[];
+    lines: { product_id: number; percentage: number; done_qty: number; note: string }[];
   }) => Promise<void>;
 }
 
 export function ParteDiarioForm({ workedHours, budgets, products, fetchObjetivo, onSubmit }: ParteDiarioFormProps) {
   const [budgetId, setBudgetId] = useState<number | "">(budgets.length === 1 ? budgets[0].id : "");
-  const [notas, setNotas] = useState("");
   const [lines, setLines] = useState<Line[]>([newLine()]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -39,18 +45,22 @@ export function ParteDiarioForm({ workedHours, budgets, products, fetchObjetivo,
   const budgetCompanyId = budgets.find((b) => b.id === budgetId)?.company_id ?? false;
 
   const availableProducts = useMemo(
-    () => products.filter((p) => p.company_ids.length === 0 || (budgetCompanyId && p.company_ids.includes(budgetCompanyId))),
+    () =>
+      products.filter(
+        (p) => p.company_ids.length === 0 || (budgetCompanyId && p.company_ids.includes(budgetCompanyId))
+      ),
     [products, budgetCompanyId]
   );
 
   const totalPct = lines.reduce((sum, l) => sum + (Number(l.percentage) || 0), 0);
   const pctOk = Math.abs(totalPct - 100) < 0.01;
   const hasLineData = lines.some((l) => l.productId !== "");
-  const hasNotas = notas.trim().length > 0;
+  // Cada línea que se registra (con producto) necesita su nota
+  const hasNotas = lines.every((l) => l.productId === "" || l.note.trim().length > 0);
   const canSubmit = !!budgetId && hasLineData && pctOk && hasNotas && !submitting;
 
   const validationMessages = [
-    !hasNotas && "Te falta ponerle una nota",
+    !hasNotas && "Te falta ponerle una nota a cada línea",
     !pctOk && "El total debe ser el 100%",
     !hasLineData && "Debes al menos llenar una línea",
   ].filter((msg): msg is string => !!msg);
@@ -83,10 +93,14 @@ export function ParteDiarioForm({ workedHours, budgets, products, fetchObjetivo,
     try {
       await onSubmit({
         budget_id: budgetId || null,
-        notas,
         lines: lines
           .filter((l) => l.productId !== "")
-          .map((l) => ({ product_id: Number(l.productId), percentage: Number(l.percentage), done_qty: Number(l.doneQty) })),
+          .map((l) => ({
+            product_id: Number(l.productId),
+            percentage: Number(l.percentage),
+            done_qty: Number(l.doneQty),
+            note: l.note.trim(),
+          })),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error de conexión");
@@ -164,6 +178,13 @@ export function ParteDiarioForm({ workedHours, budgets, products, fetchObjetivo,
                 />
               </label>
             </div>
+            <input
+              type="text"
+              className={`${inputClass} ${line.productId !== "" && !line.note.trim() ? "border-red-300" : ""}`}
+              placeholder="Nota (obligatoria)"
+              value={line.note}
+              onChange={(e) => updateLine(line.key, { note: e.target.value })}
+            />
           </div>
         ))}
       </div>
@@ -176,15 +197,9 @@ export function ParteDiarioForm({ workedHours, budgets, products, fetchObjetivo,
         + Añadir categoría
       </button>
 
-      <p className={`text-sm font-medium ${pctOk ? "text-green-600" : "text-red-600"}`}>Total %: {totalPct.toFixed(2)}</p>
-
-      <textarea
-        className={inputClass}
-        placeholder="Notas"
-        value={notas}
-        onChange={(e) => setNotas(e.target.value)}
-        rows={3}
-      />
+      <p className={`text-sm font-medium ${pctOk ? "text-green-600" : "text-red-600"}`}>
+        Total %: {totalPct.toFixed(2)}
+      </p>
 
       {error ? <Alert type="error">{error}</Alert> : null}
 
