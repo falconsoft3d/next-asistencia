@@ -67,6 +67,7 @@ interface PurchaseGroup {
   purchaseName: string;
   partnerName: string;
   pickings: PickingSummary[];
+  allDone: boolean;
 }
 
 // Agrupa por pedido respetando el orden en que llegan; los albaranes sin pedido van al final
@@ -81,10 +82,17 @@ function groupByPurchase(pickings: PickingSummary[]): PurchaseGroup[] {
         purchaseName: picking.purchase_name,
         partnerName: picking.purchase_partner_name || picking.partner_name,
         pickings: [],
+        allDone: false,
       };
       groups.set(key, group);
     }
     group.pickings.push(picking);
+  }
+  for (const group of groups.values()) {
+    // Los preparados primero (el sort es estable, el resto conserva su orden)
+    group.pickings.sort((a, b) => Number(b.state === "assigned") - Number(a.state === "assigned"));
+    const active = group.pickings.filter((p) => p.state !== "cancel");
+    group.allDone = active.length > 0 && active.every((p) => p.state === "done");
   }
   const withoutPurchase = groups.get("");
   groups.delete("");
@@ -243,7 +251,9 @@ export default function AlbaranesPage() {
                     type="button"
                     onClick={() => toggleGroup(key)}
                     aria-expanded={isOpen}
-                    className="flex w-full items-center gap-2 bg-slate-50 px-3 py-2 text-left text-xs hover:bg-slate-100"
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs ${
+                      group.allDone ? "bg-green-100 hover:bg-green-200" : "bg-slate-50 hover:bg-slate-100"
+                    }`}
                   >
                     <span
                       aria-hidden
