@@ -7,8 +7,9 @@ import type { Budget, Product } from "@/lib/types";
 interface Line {
   key: string;
   productId: number | "";
-  percentage: number;
-  doneQty: number;
+  // Se guardan como texto para poder vaciar el campo mientras se escribe
+  percentage: string;
+  doneQty: string;
   objetivo: number | null;
   note: string;
 }
@@ -17,8 +18,8 @@ function newLine(): Line {
   return {
     key: Math.random().toString(36).slice(2),
     productId: "",
-    percentage: 0,
-    doneQty: 0,
+    percentage: "",
+    doneQty: "",
     objetivo: null,
     note: "",
   };
@@ -60,7 +61,7 @@ export function ParteDiarioForm({ workedHours, budgets, products, fetchObjetivo,
   const canSubmit = !!budgetId && hasLineData && pctOk && hasNotas && !submitting;
 
   const validationMessages = [
-    !hasNotas && "Te falta ponerle una nota a cada línea",
+    !hasNotas && "Te falta poner una nota en la línea: describe el material y la zona de la obra donde lo has trabajado",
     !pctOk && "El total debe ser el 100%",
     !hasLineData && "Debes al menos llenar una línea",
   ].filter((msg): msg is string => !!msg);
@@ -97,8 +98,8 @@ export function ParteDiarioForm({ workedHours, budgets, products, fetchObjetivo,
           .filter((l) => l.productId !== "")
           .map((l) => ({
             product_id: Number(l.productId),
-            percentage: Number(l.percentage),
-            done_qty: Number(l.doneQty),
+            percentage: Number(l.percentage) || 0,
+            done_qty: Number(l.doneQty) || 0,
             note: l.note.trim(),
           })),
       });
@@ -160,7 +161,8 @@ export function ParteDiarioForm({ workedHours, budgets, products, fetchObjetivo,
                   step={0.01}
                   className={inputClass}
                   value={line.percentage}
-                  onChange={(e) => updateLine(line.key, { percentage: Number(e.target.value) })}
+                  placeholder="0"
+                  onChange={(e) => updateLine(line.key, { percentage: e.target.value })}
                 />
               </label>
               <label className="flex flex-col gap-1">
@@ -174,7 +176,8 @@ export function ParteDiarioForm({ workedHours, budgets, products, fetchObjetivo,
                   step={0.01}
                   className={inputClass}
                   value={line.doneQty}
-                  onChange={(e) => updateLine(line.key, { doneQty: Number(e.target.value) })}
+                  placeholder="0"
+                  onChange={(e) => updateLine(line.key, { doneQty: e.target.value })}
                 />
               </label>
             </div>
