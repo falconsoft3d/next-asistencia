@@ -9,7 +9,14 @@ import type { Budget, ConceptNode, ImputarPartidaLine } from "@/lib/types";
 interface OptionsResponse {
   status: "ok";
   budgets: Budget[];
+  categories: Category[];
   lines: ImputarPartidaLine[];
+}
+
+interface Category {
+  id: number;
+  name: string;
+  company_ids: number[];
 }
 
 function ConceptTree({
@@ -106,6 +113,8 @@ export default function ImputarPartidaPage() {
 
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [lines, setLines] = useState<ImputarPartidaLine[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [savingCategory, setSavingCategory] = useState<number | null>(null);
 
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
@@ -125,6 +134,7 @@ export default function ImputarPartidaPage() {
       .get<OptionsResponse>("/api/asistencia/imputar-partida/options", token)
       .then((res) => {
         setBudgets(res.budgets);
+        setCategories(res.categories ?? []);
         setLines(res.lines);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Error de conexión"))
@@ -244,6 +254,40 @@ export default function ImputarPartidaPage() {
       setError(err instanceof ApiError ? err.message : "Error de conexión");
     } finally {
       setApplying(false);
+    }
+  }
+
+  // Mismo criterio que el parte: categorías sin compañía o de la compañía del presupuesto
+  function categoriesFor(line: ImputarPartidaLine) {
+    const companyId = budgets.find((b) => b.id === line.budget_id)?.company_id;
+    const options = categories.filter(
+      (c) => c.company_ids.length === 0 || (companyId && c.company_ids.includes(companyId))
+    );
+    if (line.product_id && !options.some((c) => c.id === line.product_id)) {
+      options.unshift({ id: line.product_id, name: line.product_name, company_ids: [] });
+    }
+    return options;
+  }
+
+  async function changeCategory(line: ImputarPartidaLine, productId: number) {
+    if (!productId || productId === line.product_id) return;
+    setSavingCategory(line.id);
+    setError(null);
+    try {
+      const res = await api.post<{ status: "ok"; product_id: number; product_name: string }>(
+        "/api/asistencia/imputar-partida/categoria",
+        { line_id: line.id, product_id: productId },
+        token
+      );
+      setLines((prev) =>
+        prev.map((l) => (l.id === line.id ? { ...l, product_id: res.product_id, product_name: res.product_name } : l))
+      );
+      setMessage("Categoría actualizada");
+      setTimeout(() => setMessage(null), 4000);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Error de conexión");
+    } finally {
+      setSavingCategory(null);
     }
   }
 
@@ -394,7 +438,22 @@ export default function ImputarPartidaPage() {
                       <input type="checkbox" checked={selected.has(line.id)} onChange={() => toggleOne(line.id)} />
                     </td>
                     <td className="py-1 pr-2">{line.datetime || "—"}</td>
-                    <td className="py-1 pr-2">{line.product_name}</td>
+                    <td className="py-1 pr-2">
+                      <select
+                        aria-label="Categoría"
+                        className="w-full min-w-32 rounded border border-slate-200 bg-transparent px-1 py-0.5 text-sm hover:border-slate-400 disabled:opacity-50"
+                        value={line.product_id || ""}
+                        disabled={savingCategory === line.id}
+                        onChange={(e) => changeCategory(line, Number(e.target.value))}
+                      >
+                        {!line.product_id ? <option value="">—</option> : null}
+                        {categoriesFor(line).map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
                     <td className="py-1 text-right">{line.horas.toFixed(2)}</td>
                     <td className="py-1 pr-2">{line.employee_name}</td>
                     <td className="py-1 pr-2">{line.concept_name || "—"}</td>
