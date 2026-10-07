@@ -79,6 +79,7 @@ export interface Picking {
   partner_name: string;
   project_name: string;
   purchase_name: string;
+  purchase_partner_name: string;
   origin: string;
   scheduled_date: string | false;
   state: string;
