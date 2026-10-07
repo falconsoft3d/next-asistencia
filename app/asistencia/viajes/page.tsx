@@ -49,7 +49,10 @@ export default function ViajesPage() {
       .then((res) => {
         const companies = res.companies ?? [];
         setCompanies(companies);
-        setCompanyId(res.default_company_id || companies[0]?.id || "");
+        const defaultId = companies.some((c) => c.id === res.default_company_id)
+          ? res.default_company_id
+          : false;
+        setCompanyId(defaultId || companies[0]?.id || "");
         setProjects(res.projects);
         setVehicles(res.vehicles);
         setDateStart(res.today);

@@ -48,7 +48,11 @@ export default function EntrarPage() {
       .then(([options, me]) => {
         setCompanies(options.companies);
         setProjects(options.projects);
-        setCompanyId(options.default_company_id || options.companies[0]?.id || "");
+        // La compañía del empleado solo vale por defecto si está entre sus compañías de asistencia
+        const defaultId = options.companies.some((c) => c.id === options.default_company_id)
+          ? options.default_company_id
+          : false;
+        setCompanyId(defaultId || options.companies[0]?.id || "");
         setEmployee(me.employee);
         if (me.open_attendance) router.replace("/asistencia/salir");
       })

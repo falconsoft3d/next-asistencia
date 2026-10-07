@@ -64,7 +64,10 @@ export default function SalirPage() {
         const companies = options.companies ?? [];
         setCompanies(companies);
         // Se parte de la compañía y el proyecto con los que se fichó la entrada
-        setCompanyId(options.open_attendance.project.company_id || companies[0]?.id || "");
+        const entryCompanyId = options.open_attendance.project.company_id;
+        setCompanyId(
+          (companies.some((c) => c.id === entryCompanyId) && entryCompanyId) || companies[0]?.id || ""
+        );
         setProjects(options.projects);
         setProjectId(options.open_attendance.project.id);
         setEmployee(me.employee);
