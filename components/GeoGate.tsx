@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { GeoDisplay } from "./GeoDisplay";
 import { Alert, Button } from "./ui";
 
 interface GeoGateProps {
@@ -42,6 +43,7 @@ export function GeoGate({ disabled, disabledHint, label = "Geolocalizar", onVeri
 
   return (
     <div className="flex w-full flex-col gap-2">
+      <GeoDisplay />
       <Button type="button" onClick={handleClick} disabled={disabled || loading}>
         {loading ? "Comprobando ubicación…" : label}
       </Button>
