@@ -16,6 +16,7 @@ interface OptionsResponse {
 interface PickingsResponse {
   status: "ok";
   pickings: PickingSummary[];
+  suppliers: { id: number; name: string }[];
 }
 
 type Scope = "ready" | "all";
@@ -23,6 +24,7 @@ type Scope = "ready" | "all";
 interface Filter {
   projectId: number | "";
   scope: Scope;
+  partnerId: number | "";
 }
 
 // Se recuerdan el filtro y los pedidos desplegados para no perderlos al volver del detalle
@@ -30,12 +32,16 @@ const FILTER_KEY = "asistencia_albaranes_filter";
 const EXPANDED_KEY = "asistencia_albaranes_expanded";
 
 function readFilter(): Filter {
-  const fallback: Filter = { projectId: "", scope: "ready" };
+  const fallback: Filter = { projectId: "", scope: "ready", partnerId: "" };
   if (typeof window === "undefined") return fallback;
   try {
     const saved = JSON.parse(window.sessionStorage.getItem(FILTER_KEY) || "null");
     if (!saved) return fallback;
-    return { projectId: Number(saved.projectId) || "", scope: saved.scope === "all" ? "all" : "ready" };
+    return {
+      projectId: Number(saved.projectId) || "",
+      scope: saved.scope === "all" ? "all" : "ready",
+      partnerId: Number(saved.partnerId) || "",
+    };
   } catch {
     return fallback;
   }
@@ -146,6 +152,7 @@ export default function AlbaranesPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [filter, setFilter] = useState<Filter>(readFilter);
   const [pickings, setPickings] = useState<PickingSummary[]>([]);
+  const [suppliers, setSuppliers] = useState<PickingsResponse["suppliers"]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string[]>(readExpanded);
@@ -161,17 +168,20 @@ export default function AlbaranesPage() {
     let cancelled = false;
     api
       .get<PickingsResponse>(
-        `/api/asistencia/gestion/albaranes?project_id=${filter.projectId || 0}&scope=${filter.scope}`,
+        `/api/asistencia/gestion/albaranes?project_id=${filter.projectId || 0}&scope=${filter.scope}` +
+          `&partner_id=${filter.partnerId || 0}`,
         token
       )
       .then((res) => {
         if (cancelled) return;
         setPickings(res.pickings);
+        setSuppliers(res.suppliers ?? []);
         setError(null);
       })
       .catch((err) => {
         if (cancelled) return;
         setPickings([]);
+        setSuppliers([]);
         setError(err instanceof ApiError ? err.message : "Error de conexión");
       })
       .finally(() => {
@@ -209,12 +219,12 @@ export default function AlbaranesPage() {
           <Subtitle>Recepciones y devoluciones de tus proyectos</Subtitle>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,3fr)_auto_minmax(0,2fr)]">
           <select
             className={inputClass}
             aria-label="Proyecto"
             value={filter.projectId}
-            onChange={(e) => changeFilter({ projectId: Number(e.target.value) || "" })}
+            onChange={(e) => changeFilter({ projectId: Number(e.target.value) || "", partnerId: "" })}
           >
             <option value="">Todos mis proyectos</option>
             {projects.map((p) => (
@@ -231,6 +241,23 @@ export default function AlbaranesPage() {
           >
             <option value="ready">Preparados</option>
             <option value="all">Todos</option>
+          </select>
+          <select
+            className={inputClass}
+            aria-label="Proveedor"
+            value={filter.partnerId}
+            onChange={(e) => changeFilter({ partnerId: Number(e.target.value) || "" })}
+          >
+            <option value="">Todos los proveedores</option>
+            {/* El proveedor elegido se mantiene aunque deje de tener albaranes con el filtro de estado */}
+            {filter.partnerId && !suppliers.some((s) => s.id === filter.partnerId) ? (
+              <option value={filter.partnerId}>Proveedor seleccionado</option>
+            ) : null}
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
           </select>
         </div>
 
