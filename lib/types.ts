@@ -52,6 +52,11 @@ export interface SolmatLine {
   quantity: number;
 }
 
+export interface SolmatPhoto {
+  id: number;
+  name: string;
+}
+
 export interface Solmat {
   id: number;
   name: string;
@@ -61,6 +66,7 @@ export interface Solmat {
   state_label: string;
   purchase_order_name: string;
   lines: SolmatLine[];
+  photos: SolmatPhoto[];
 }
 
 export interface PickingLine {

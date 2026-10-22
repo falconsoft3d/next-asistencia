@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Alert, Button, Card, PageShell, Spinner, Subtitle, Title } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { employeeAuth } from "@/lib/storage";
-import type { Solmat } from "@/lib/types";
+import type { Solmat, SolmatPhoto } from "@/lib/types";
 
 interface SolmatsResponse {
   status: "ok";
@@ -26,6 +26,47 @@ function fmtDate(value: string | false) {
 
 function fmtQty(value: number) {
   return value.toLocaleString("es-ES", { maximumFractionDigits: 3 });
+}
+
+// La foto se pide con el token (un <img src> directo no puede enviarlo)
+function PhotoThumb({ solmatId, photo, token }: { solmatId: number; photo: SolmatPhoto; token: string | null }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    let cancelled = false;
+    api
+      .blob(`/api/asistencia/solmat/${solmatId}/fotos/${photo.id}`, token)
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      })
+      .catch(() => !cancelled && setFailed(true));
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [solmatId, photo.id, token]);
+
+  return (
+    <a
+      href={url ?? undefined}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-400"
+    >
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element -- imagen privada cargada como blob
+        <img src={url} alt={photo.name} className="h-full w-full object-cover" />
+      ) : failed ? (
+        "Sin foto"
+      ) : (
+        "Cargando…"
+      )}
+    </a>
+  );
 }
 
 export default function SolicitudesPage() {
@@ -99,6 +140,13 @@ export default function SolicitudesPage() {
                   ))}
                 </tbody>
               </table>
+              {solmat.photos?.length ? (
+                <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                  {solmat.photos.map((photo) => (
+                    <PhotoThumb key={photo.id} solmatId={solmat.id} photo={photo} token={token} />
+                  ))}
+                </div>
+              ) : null}
             </div>
           ))}
           {solmats.length === 0 && !error ? (

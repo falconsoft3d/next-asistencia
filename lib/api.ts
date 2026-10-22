@@ -44,8 +44,23 @@ async function request<T>(
   return json as T;
 }
 
+// Descarga un archivo protegido (p. ej. una foto): <img src> no puede enviar el token
+async function requestBlob(path: string, token?: string | null): Promise<Blob> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+  } catch {
+    throw new ApiError("No se pudo conectar con el servidor", 0);
+  }
+  if (!res.ok) throw new ApiError("No se pudo cargar el archivo", res.status);
+  return res.blob();
+}
+
 export const api = {
   get: <T>(path: string, token?: string | null) => request<T>(path, { token }),
   post: <T>(path: string, body: unknown = {}, token?: string | null) =>
     request<T>(path, { method: "POST", body, token }),
+  blob: requestBlob,
 };

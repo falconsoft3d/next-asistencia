@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ProjectCombobox } from "@/components/ProjectCombobox";
 import { Alert, Button, Card, PageShell, Spinner, Subtitle, Title, inputClass } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
+import { toJpegBase64 } from "@/lib/photo";
 import { employeeAuth, solmatNotes } from "@/lib/storage";
 import type { Project } from "@/lib/types";
 
@@ -23,6 +24,11 @@ interface Line {
   key: number;
   note: string;
   quantity: string;
+}
+
+interface Photo {
+  key: number;
+  data: string; // JPEG en base64
 }
 
 let nextKey = 1;
@@ -100,6 +106,9 @@ export default function SolmatPage() {
   const [submitting, setSubmitting] = useState(false);
   const [createdName, setCreatedName] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>(() => solmatNotes.get());
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [processingPhoto, setProcessingPhoto] = useState(false);
+  const photoInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api
@@ -115,6 +124,21 @@ export default function SolmatPage() {
 
   function removeLine(key: number) {
     setLines((prev) => (prev.length > 1 ? prev.filter((l) => l.key !== key) : [emptyLine()]));
+  }
+
+  async function addPhotos(files: File[]) {
+    setError(null);
+    setProcessingPhoto(true);
+    try {
+      for (const file of files) {
+        const data = await toJpegBase64(file);
+        setPhotos((prev) => [...prev, { key: nextKey++, data }]);
+      }
+    } catch {
+      setError("No se pudo leer la foto");
+    } finally {
+      setProcessingPhoto(false);
+    }
   }
 
   async function handleSubmit() {
@@ -142,6 +166,7 @@ export default function SolmatPage() {
             note: l.note.trim(),
             quantity: Number(l.quantity),
           })),
+          photos: photos.map((p) => p.data),
         },
         token
       );
@@ -166,6 +191,7 @@ export default function SolmatPage() {
           <Button
             onClick={() => {
               setLines([emptyLine()]);
+              setPhotos([]);
               setCreatedName(null);
             }}
           >
@@ -251,13 +277,56 @@ export default function SolmatPage() {
                 Añadir línea
               </button>
             </div>
+
+            {photos.length > 0 ? (
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {photos.map((photo) => (
+                  <div key={photo.key} className="relative aspect-square overflow-hidden rounded-lg border border-slate-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- vista previa local en base64 */}
+                    <img
+                      src={`data:image/jpeg;base64,${photo.data}`}
+                      alt="Foto adjunta"
+                      className="h-full w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-1 top-1 rounded-full bg-white/90 px-2 py-0.5 text-xs text-red-600 shadow hover:bg-white"
+                      aria-label="Quitar foto"
+                      onClick={() => setPhotos((prev) => prev.filter((p) => p.key !== photo.key))}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            <input
+              ref={photoInput}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? []);
+                e.target.value = "";
+                if (files.length) addPhotos(files);
+              }}
+            />
+            <Button
+              className="bg-slate-700! hover:bg-slate-800! disabled:bg-slate-400!"
+              disabled={submitting || processingPhoto}
+              onClick={() => photoInput.current?.click()}
+            >
+              {processingPhoto ? "Preparando foto…" : "Adjuntar foto"}
+            </Button>
           </>
         )}
 
         {error ? <Alert type="error">{error}</Alert> : null}
 
         {projects.length > 0 ? (
-          <Button variant="success" onClick={handleSubmit} disabled={submitting || !projectId}>
+          <Button variant="success" onClick={handleSubmit} disabled={submitting || processingPhoto || !projectId}>
             {submitting ? "Enviando…" : "Solicitar"}
           </Button>
         ) : null}
