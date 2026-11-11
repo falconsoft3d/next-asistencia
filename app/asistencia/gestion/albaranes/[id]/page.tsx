@@ -19,6 +19,8 @@ interface ReadPhotoResponse {
   supplier_reference: string;
   lines: { id: number; quantity: number }[];
   ai_error: string;
+  /** Incidencia de compra creada si el albarán del proveedor supera lo pendiente */
+  incident?: { name: string; lines: { name: string; quantity: number; uom: string }[] } | null;
 }
 
 interface UpdateResponse {
@@ -64,6 +66,7 @@ export default function AlbaranPage() {
   const photoInput = useRef<HTMLInputElement>(null);
   const aiInput = useRef<HTMLInputElement>(null);
   const [confirming, setConfirming] = useState(false);
+  const [incident, setIncident] = useState<ReadPhotoResponse["incident"]>(null);
 
   function load(next: Picking) {
     setPicking(next);
@@ -141,6 +144,7 @@ export default function AlbaranPage() {
     if (!picking) return;
     setError(null);
     setMessage(null);
+    setIncident(null);
     setBusy("ai");
     try {
       let photo: string;
@@ -156,10 +160,12 @@ export default function AlbaranPage() {
       );
       // Solo se actualiza el contador de fotos: recargar borraría cantidades sin guardar
       setPicking((prev) => (prev ? { ...prev, photo_count: res.picking.photo_count } : prev));
-      if (res.ai_error) {
+      if (res.incident) setIncident(res.incident);
+      if (res.ai_error && !res.lines.length) {
         setError(`La foto se ha adjuntado, pero no se pudo leer con IA: ${res.ai_error}`);
         return;
       }
+      if (res.ai_error) setError(res.ai_error);
       if (res.supplier_reference) setSupplierRef(res.supplier_reference);
       if (res.lines.length) {
         setQuantities((prev) => {
@@ -313,6 +319,22 @@ export default function AlbaranPage() {
           </>
         ) : null}
 
+        {incident ? (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <p className="font-semibold">Incidencia de compra {incident.name}</p>
+            <p className="mt-0.5">
+              El albarán del proveedor trae más de lo pendiente. La cantidad se ha ajustado a lo pendiente y
+              el exceso queda registrado en la incidencia:
+            </p>
+            <ul className="mt-1 list-disc pl-5">
+              {incident.lines.map((l) => (
+                <li key={l.name}>
+                  {l.name}: +{fmtQty(l.quantity)} {l.uom}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {message ? <Alert type="success">{message}</Alert> : null}
         {error ? <Alert type="error">{error}</Alert> : null}
 
