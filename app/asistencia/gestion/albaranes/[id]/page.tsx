@@ -18,6 +18,8 @@ interface ReadPhotoResponse {
   picking: Picking;
   supplier_reference: string;
   lines: { id: number; quantity: number }[];
+  /** Líneas del pedido encontradas en el albarán del proveedor (el resto queda a 0) */
+  matched?: number;
   ai_error: string;
   /** Incidencia de compra creada si el albarán del proveedor supera lo pendiente */
   incident?: { name: string; lines: { name: string; quantity: number; uom: string }[] } | null;
@@ -174,17 +176,18 @@ export default function AlbaranPage() {
           return next;
         });
       }
+      const matched = res.matched ?? 0;
+      const zeroed = res.lines.length - matched;
       const read = [
         res.supplier_reference ? `la referencia ${res.supplier_reference}` : null,
         res.lines.length
-          ? res.lines.length === 1
-            ? "la cantidad de 1 línea"
-            : `las cantidades de ${res.lines.length} líneas`
+          ? `${matched} ${matched === 1 ? "línea encontrada" : "líneas encontradas"} en el albarán` +
+            (zeroed > 0 ? ` y ${zeroed} a 0 por no venir en él` : "")
           : null,
       ].filter(Boolean);
       setMessage(
         read.length
-          ? `Foto adjuntada. La IA ha rellenado ${read.join(" y ")}: revísalo y pulsa Guardar.`
+          ? `Foto adjuntada. La IA ha rellenado ${read.join(", ")}: revísalo y pulsa Guardar.`
           : "Foto adjuntada. La IA no ha encontrado datos del albarán en la foto."
       );
     } catch (err) {
@@ -323,8 +326,8 @@ export default function AlbaranPage() {
           <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             <p className="font-semibold">Incidencia de compra {incident.name}</p>
             <p className="mt-0.5">
-              El albarán del proveedor trae más de lo pendiente. La cantidad se ha ajustado a lo pendiente y
-              el exceso queda registrado en la incidencia:
+              El albarán del proveedor trae material por encima de lo pendiente o que no está en el pedido.
+              Las cantidades se han ajustado a lo pendiente y el resto queda registrado en la incidencia:
             </p>
             <ul className="mt-1 list-disc pl-5">
               {incident.lines.map((l) => (
