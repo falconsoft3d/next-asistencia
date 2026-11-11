@@ -13,6 +13,14 @@ interface PickingResponse {
   picking: Picking;
 }
 
+interface ReadPhotoResponse {
+  status: "ok";
+  picking: Picking;
+  supplier_reference: string;
+  lines: { id: number; quantity: number }[];
+  ai_error: string;
+}
+
 interface UpdateResponse {
   status: "ok";
   picking: Picking;
@@ -52,8 +60,9 @@ export default function AlbaranPage() {
   const [supplierRef, setSupplierRef] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
   const [quantities, setQuantities] = useState<Record<number, string>>({});
-  const [busy, setBusy] = useState<"save" | "validate" | "photo" | null>(null);
+  const [busy, setBusy] = useState<"save" | "validate" | "photo" | "ai" | null>(null);
   const photoInput = useRef<HTMLInputElement>(null);
+  const aiInput = useRef<HTMLInputElement>(null);
   const [confirming, setConfirming] = useState(false);
 
   function load(next: Picking) {
@@ -119,6 +128,59 @@ export default function AlbaranPage() {
       // Solo se actualiza el contador: recargar el albarán borraría cantidades sin guardar
       setPicking((prev) => (prev ? { ...prev, photo_count: res.picking.photo_count } : prev));
       setMessage("Foto adjuntada");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Error de conexión");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // «Cargar con IA»: la foto queda en el chatter y la IA rellena la referencia y las cantidades.
+  // No se guarda nada más: el encargado revisa y pulsa Guardar.
+  async function readWithAi(file: File) {
+    if (!picking) return;
+    setError(null);
+    setMessage(null);
+    setBusy("ai");
+    try {
+      let photo: string;
+      try {
+        photo = await toJpegBase64(file);
+      } catch {
+        throw new ApiError("No se pudo leer la imagen");
+      }
+      const res = await api.post<ReadPhotoResponse>(
+        `/api/asistencia/gestion/albaranes/${picking.id}/leer-foto`,
+        { photo },
+        token
+      );
+      // Solo se actualiza el contador de fotos: recargar borraría cantidades sin guardar
+      setPicking((prev) => (prev ? { ...prev, photo_count: res.picking.photo_count } : prev));
+      if (res.ai_error) {
+        setError(`La foto se ha adjuntado, pero no se pudo leer con IA: ${res.ai_error}`);
+        return;
+      }
+      if (res.supplier_reference) setSupplierRef(res.supplier_reference);
+      if (res.lines.length) {
+        setQuantities((prev) => {
+          const next = { ...prev };
+          for (const l of res.lines) next[l.id] = String(l.quantity);
+          return next;
+        });
+      }
+      const read = [
+        res.supplier_reference ? `la referencia ${res.supplier_reference}` : null,
+        res.lines.length
+          ? res.lines.length === 1
+            ? "la cantidad de 1 línea"
+            : `las cantidades de ${res.lines.length} líneas`
+          : null,
+      ].filter(Boolean);
+      setMessage(
+        read.length
+          ? `Foto adjuntada. La IA ha rellenado ${read.join(" y ")}: revísalo y pulsa Guardar.`
+          : "Foto adjuntada. La IA no ha encontrado datos del albarán en la foto."
+      );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Error de conexión");
     } finally {
@@ -294,6 +356,28 @@ export default function AlbaranPage() {
 
         {picking ? (
           <>
+            {picking.editable ? (
+              <>
+                <input
+                  ref={aiInput}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) readWithAi(file);
+                  }}
+                />
+                <Button
+                  className="bg-violet-600! hover:bg-violet-700! disabled:bg-violet-300!"
+                  disabled={busy !== null}
+                  onClick={() => aiInput.current?.click()}
+                >
+                  {busy === "ai" ? "Leyendo con IA…" : "Cargar con IA"}
+                </Button>
+              </>
+            ) : null}
             <input
               ref={photoInput}
               type="file"

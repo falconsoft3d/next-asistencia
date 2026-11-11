@@ -156,6 +156,8 @@ export default function SolmatPage() {
     setReadingAi(true);
     try {
       const photo = await toJpegBase64(file);
+      // La foto leída se adjunta a la solicitud y queda en el chatter al pulsar Solicitar
+      setPhotos((prev) => [...prev, { key: nextKey++, data: photo }]);
       const res = await api.post<ReadPhotoResponse>("/api/asistencia/solmat/leer-foto", { photo }, token);
       if (res.lines.length === 0) {
         setAiInfo("La IA no ha encontrado material en la foto.");
@@ -165,7 +167,7 @@ export default function SolmatPage() {
       // Las líneas vacías se sustituyen; las que ya tenían nota se conservan
       setLines((prev) => [...prev.filter((l) => l.note.trim()), ...read]);
       setAiInfo(
-        `Se ${read.length === 1 ? "ha añadido 1 línea" : `han añadido ${read.length} líneas`} desde la foto. Revísalas antes de solicitar.`
+        `Se ${read.length === 1 ? "ha añadido 1 línea" : `han añadido ${read.length} líneas`} desde la foto. Revísalas antes de solicitar; la foto se adjuntará a la solicitud.`
       );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo leer la foto");
