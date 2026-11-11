@@ -14,6 +14,11 @@ interface OptionsResponse {
   projects: Project[];
 }
 
+interface ReadPhotoResponse {
+  status: "ok";
+  lines: { note: string; quantity: number }[];
+}
+
 interface CreateResponse {
   status: "ok";
   solmat_id: number;
@@ -109,6 +114,9 @@ export default function SolmatPage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [processingPhoto, setProcessingPhoto] = useState(false);
   const photoInput = useRef<HTMLInputElement>(null);
+  const [readingAi, setReadingAi] = useState(false);
+  const [aiInfo, setAiInfo] = useState<string | null>(null);
+  const aiInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api
@@ -138,6 +146,31 @@ export default function SolmatPage() {
       setError("No se pudo leer la foto");
     } finally {
       setProcessingPhoto(false);
+    }
+  }
+
+  // «Cargar con IA»: Claude lee la foto y rellena las líneas (nota + cantidad)
+  async function readWithAi(file: File) {
+    setError(null);
+    setAiInfo(null);
+    setReadingAi(true);
+    try {
+      const photo = await toJpegBase64(file);
+      const res = await api.post<ReadPhotoResponse>("/api/asistencia/solmat/leer-foto", { photo }, token);
+      if (res.lines.length === 0) {
+        setAiInfo("La IA no ha encontrado material en la foto.");
+        return;
+      }
+      const read = res.lines.map((l) => ({ key: nextKey++, note: l.note, quantity: String(l.quantity) }));
+      // Las líneas vacías se sustituyen; las que ya tenían nota se conservan
+      setLines((prev) => [...prev.filter((l) => l.note.trim()), ...read]);
+      setAiInfo(
+        `Se ${read.length === 1 ? "ha añadido 1 línea" : `han añadido ${read.length} líneas`} desde la foto. Revísalas antes de solicitar.`
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "No se pudo leer la foto");
+    } finally {
+      setReadingAi(false);
     }
   }
 
@@ -192,6 +225,7 @@ export default function SolmatPage() {
             onClick={() => {
               setLines([emptyLine()]);
               setPhotos([]);
+              setAiInfo(null);
               setCreatedName(null);
             }}
           >
@@ -302,6 +336,26 @@ export default function SolmatPage() {
             ) : null}
 
             <input
+              ref={aiInput}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) readWithAi(file);
+              }}
+            />
+            <Button
+              className="bg-violet-600! hover:bg-violet-700! disabled:bg-violet-300!"
+              disabled={submitting || processingPhoto || readingAi}
+              onClick={() => aiInput.current?.click()}
+            >
+              {readingAi ? "Leyendo con IA…" : "Cargar con IA"}
+            </Button>
+            {aiInfo ? <Alert type="info">{aiInfo}</Alert> : null}
+
+            <input
               ref={photoInput}
               type="file"
               accept="image/*"
@@ -315,7 +369,7 @@ export default function SolmatPage() {
             />
             <Button
               className="bg-slate-700! hover:bg-slate-800! disabled:bg-slate-400!"
-              disabled={submitting || processingPhoto}
+              disabled={submitting || processingPhoto || readingAi}
               onClick={() => photoInput.current?.click()}
             >
               {processingPhoto ? "Preparando foto…" : "Adjuntar foto"}
@@ -326,7 +380,7 @@ export default function SolmatPage() {
         {error ? <Alert type="error">{error}</Alert> : null}
 
         {projects.length > 0 ? (
-          <Button variant="success" onClick={handleSubmit} disabled={submitting || processingPhoto || !projectId}>
+          <Button variant="success" onClick={handleSubmit} disabled={submitting || processingPhoto || readingAi || !projectId}>
             {submitting ? "Enviando…" : "Solicitar"}
           </Button>
         ) : null}
