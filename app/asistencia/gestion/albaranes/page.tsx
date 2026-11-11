@@ -129,6 +129,9 @@ function PickingRow({ picking }: { picking: PickingSummary }) {
             {picking.state_label}
           </span>
         </div>
+        {picking.supplier_reference ? (
+          <p className="truncate text-xs font-medium text-slate-700">Ref. proveedor: {picking.supplier_reference}</p>
+        ) : null}
         <p className="truncate text-xs text-slate-600">{picking.partner_name || "—"}</p>
         <p className="truncate text-xs text-slate-500">{picking.project_name}</p>
       </div>
