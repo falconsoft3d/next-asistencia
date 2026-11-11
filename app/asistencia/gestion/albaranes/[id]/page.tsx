@@ -282,34 +282,47 @@ export default function AlbaranPage() {
                 </tr>
               </thead>
               <tbody>
-                {picking.lines.map((line) => (
-                  <tr key={line.id} className="border-b border-slate-100 align-top">
-                    <td className="whitespace-pre-line py-2 pr-2">{line.name}</td>
-                    <td className="py-2 text-right">
-                      {picking.editable ? (
-                        <>
-                          <input
-                            type="number"
-                            min="0"
-                            step="any"
-                            inputMode="decimal"
-                            className={`${inputClass} text-right`}
-                            aria-label="Cantidad"
-                            value={quantities[line.id] ?? ""}
-                            onChange={(e) => setQuantities((prev) => ({ ...prev, [line.id]: e.target.value }))}
-                          />
-                          <span className="mt-0.5 block whitespace-nowrap text-xs text-slate-500">
-                            de {fmtQty(line.demand)} {line.uom}
+                {picking.lines.map((line) => {
+                  // Por encima de lo pedido: se puede recibir, pero se marca en rojo
+                  const over = Number(quantities[line.id] || 0) - line.demand;
+                  const isOver = over > 1e-9;
+                  return (
+                    <tr key={line.id} className={`border-b border-slate-100 align-top ${isOver ? "bg-red-50/60" : ""}`}>
+                      <td className="whitespace-pre-line py-2 pr-2">{line.name}</td>
+                      <td className="py-2 text-right">
+                        {picking.editable ? (
+                          <>
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              inputMode="decimal"
+                              className={`${inputClass} text-right ${
+                                isOver ? "border-red-500! bg-red-50! font-semibold text-red-700!" : ""
+                              }`}
+                              aria-label="Cantidad"
+                              aria-invalid={isOver}
+                              value={quantities[line.id] ?? ""}
+                              onChange={(e) => setQuantities((prev) => ({ ...prev, [line.id]: e.target.value }))}
+                            />
+                            <span
+                              className={`mt-0.5 block whitespace-nowrap text-xs ${
+                                isOver ? "font-semibold text-red-600" : "text-slate-500"
+                              }`}
+                            >
+                              de {fmtQty(line.demand)} {line.uom}
+                              {isOver ? ` (+${fmtQty(over)})` : ""}
+                            </span>
+                          </>
+                        ) : (
+                          <span className={`whitespace-nowrap ${line.quantity > line.demand ? "font-semibold text-red-600" : ""}`}>
+                            {fmtQty(line.quantity)} {line.uom}
                           </span>
-                        </>
-                      ) : (
-                        <span className="whitespace-nowrap">
-                          {fmtQty(line.quantity)} {line.uom}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
                 {picking.lines.length === 0 ? (
                   <tr>
                     <td colSpan={2} className="py-2 text-center text-slate-400">
@@ -327,7 +340,7 @@ export default function AlbaranPage() {
             <p className="font-semibold">Incidencia de compra {incident.name}</p>
             <p className="mt-0.5">
               El albarán del proveedor trae material por encima de lo pendiente o que no está en el pedido.
-              Las cantidades se han ajustado a lo pendiente y el resto queda registrado en la incidencia:
+              Se han puesto las cantidades del proveedor (en rojo lo que supera lo pedido) y queda registrado en la incidencia:
             </p>
             <ul className="mt-1 list-disc pl-5">
               {incident.lines.map((l) => (
