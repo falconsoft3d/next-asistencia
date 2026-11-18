@@ -322,7 +322,7 @@ export default function SolmatPage() {
               <textarea
                 className={`${inputClass} min-h-20`}
                 rows={3}
-                placeholder="Notas de la solicitud"
+                placeholder="Ej.: ¿Se recepciona en obra o en el almacén? ¿Para qué día es el material?"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
