@@ -20,11 +20,14 @@ interface PickingsResponse {
 }
 
 type Scope = "ready" | "all";
+type PickingType = "" | "incoming" | "outgoing";
 
 interface Filter {
   projectId: number | "";
   scope: Scope;
   partnerId: number | "";
+  /** "" = recepciones y devoluciones */
+  type: PickingType;
   /** Texto a buscar en el número de pedido */
   purchase: string;
 }
@@ -34,7 +37,7 @@ const FILTER_KEY = "asistencia_albaranes_filter";
 const EXPANDED_KEY = "asistencia_albaranes_expanded";
 
 function readFilter(): Filter {
-  const fallback: Filter = { projectId: "", scope: "ready", partnerId: "", purchase: "" };
+  const fallback: Filter = { projectId: "", scope: "ready", partnerId: "", type: "", purchase: "" };
   if (typeof window === "undefined") return fallback;
   try {
     const saved = JSON.parse(window.sessionStorage.getItem(FILTER_KEY) || "null");
@@ -43,6 +46,7 @@ function readFilter(): Filter {
       projectId: Number(saved.projectId) || "",
       scope: saved.scope === "all" ? "all" : "ready",
       partnerId: Number(saved.partnerId) || "",
+      type: saved.type === "incoming" || saved.type === "outgoing" ? saved.type : "",
       purchase: typeof saved.purchase === "string" ? saved.purchase : "",
     };
   } catch {
@@ -186,7 +190,8 @@ export default function AlbaranesPage() {
     api
       .get<PickingsResponse>(
         `/api/asistencia/gestion/albaranes?project_id=${filter.projectId || 0}&scope=${filter.scope}` +
-          `&partner_id=${filter.partnerId || 0}&purchase=${encodeURIComponent(filter.purchase)}`,
+          `&partner_id=${filter.partnerId || 0}&purchase=${encodeURIComponent(filter.purchase)}` +
+          `&type=${filter.type}`,
         token
       )
       .then((res) => {
@@ -258,9 +263,9 @@ export default function AlbaranesPage() {
           onChange={(e) => setPurchaseInput(e.target.value)}
         />
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,3fr)_auto_minmax(0,2fr)]">
+        <div className="grid grid-cols-2 gap-2">
           <select
-            className={inputClass}
+            className={`${inputClass} col-span-2`}
             aria-label="Proyecto"
             value={filter.projectId}
             onChange={(e) => changeFilter({ projectId: Number(e.target.value) || "", partnerId: "" })}
@@ -279,10 +284,20 @@ export default function AlbaranesPage() {
             onChange={(e) => changeFilter({ scope: e.target.value as Scope })}
           >
             <option value="ready">Preparados</option>
-            <option value="all">Todos</option>
+            <option value="all">Todos los estados</option>
           </select>
           <select
             className={inputClass}
+            aria-label="Tipo"
+            value={filter.type}
+            onChange={(e) => changeFilter({ type: e.target.value as PickingType })}
+          >
+            <option value="">Recepciones y devoluciones</option>
+            <option value="incoming">Recepciones</option>
+            <option value="outgoing">Devoluciones</option>
+          </select>
+          <select
+            className={`${inputClass} col-span-2`}
             aria-label="Proveedor"
             value={filter.partnerId}
             onChange={(e) => changeFilter({ partnerId: Number(e.target.value) || "" })}
