@@ -25,6 +25,8 @@ interface Filter {
   projectId: number | "";
   scope: Scope;
   partnerId: number | "";
+  /** Texto a buscar en el número de pedido */
+  purchase: string;
 }
 
 // Se recuerdan el filtro y los pedidos desplegados para no perderlos al volver del detalle
@@ -32,7 +34,7 @@ const FILTER_KEY = "asistencia_albaranes_filter";
 const EXPANDED_KEY = "asistencia_albaranes_expanded";
 
 function readFilter(): Filter {
-  const fallback: Filter = { projectId: "", scope: "ready", partnerId: "" };
+  const fallback: Filter = { projectId: "", scope: "ready", partnerId: "", purchase: "" };
   if (typeof window === "undefined") return fallback;
   try {
     const saved = JSON.parse(window.sessionStorage.getItem(FILTER_KEY) || "null");
@@ -41,6 +43,7 @@ function readFilter(): Filter {
       projectId: Number(saved.projectId) || "",
       scope: saved.scope === "all" ? "all" : "ready",
       partnerId: Number(saved.partnerId) || "",
+      purchase: typeof saved.purchase === "string" ? saved.purchase : "",
     };
   } catch {
     return fallback;
@@ -159,6 +162,8 @@ export default function AlbaranesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string[]>(readExpanded);
+  // Lo que se escribe en el buscador; se aplica al filtro tras una pausa al teclear
+  const [purchaseInput, setPurchaseInput] = useState(filter.purchase);
 
   useEffect(() => {
     api
@@ -172,7 +177,7 @@ export default function AlbaranesPage() {
     api
       .get<PickingsResponse>(
         `/api/asistencia/gestion/albaranes?project_id=${filter.projectId || 0}&scope=${filter.scope}` +
-          `&partner_id=${filter.partnerId || 0}`,
+          `&partner_id=${filter.partnerId || 0}&purchase=${encodeURIComponent(filter.purchase)}`,
         token
       )
       .then((res) => {
@@ -197,6 +202,14 @@ export default function AlbaranesPage() {
 
   const groups = useMemo(() => groupByPurchase(pickings), [pickings]);
 
+  useEffect(() => {
+    const value = purchaseInput.trim();
+    if (value === filter.purchase) return;
+    const timer = window.setTimeout(() => changeFilter({ purchase: value }), 400);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo debe reaccionar al texto escrito
+  }, [purchaseInput]);
+
   function toggleGroup(key: string) {
     const next = expanded.includes(key) ? expanded.filter((k) => k !== key) : [...expanded, key];
     try {
@@ -209,7 +222,11 @@ export default function AlbaranesPage() {
 
   function changeFilter(changes: Partial<Filter>) {
     const next = { ...filter, ...changes };
-    window.sessionStorage.setItem(FILTER_KEY, JSON.stringify(next));
+    try {
+      window.sessionStorage.setItem(FILTER_KEY, JSON.stringify(next));
+    } catch {
+      // sin almacenamiento solo se pierde el filtro al volver
+    }
     setLoading(true);
     setFilter(next);
   }
@@ -221,6 +238,16 @@ export default function AlbaranesPage() {
           <Title>Recibir material</Title>
           <Subtitle>Recepciones y devoluciones de tus proyectos</Subtitle>
         </div>
+
+        <input
+          type="search"
+          inputMode="search"
+          className={inputClass}
+          aria-label="Número de pedido"
+          placeholder="Buscar por nº de pedido (p. ej. P02784)"
+          value={purchaseInput}
+          onChange={(e) => setPurchaseInput(e.target.value)}
+        />
 
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,3fr)_auto_minmax(0,2fr)]">
           <select
@@ -274,7 +301,8 @@ export default function AlbaranesPage() {
           <ul className="flex flex-col divide-y divide-slate-100 rounded-lg border border-slate-200">
             {groups.map((group) => {
               const key = group.key || "sin-pedido";
-              const isOpen = expanded.includes(key);
+              // Al buscar un pedido se despliegan los resultados
+              const isOpen = !!filter.purchase || expanded.includes(key);
               return (
                 <li key={key}>
                   <button
