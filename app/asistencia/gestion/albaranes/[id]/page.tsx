@@ -64,8 +64,7 @@ export default function AlbaranPage() {
   const [supplierRef, setSupplierRef] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
   const [quantities, setQuantities] = useState<Record<number, string>>({});
-  const [busy, setBusy] = useState<"save" | "validate" | "photo" | "ai" | null>(null);
-  const photoInput = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState<"save" | "validate" | "ai" | null>(null);
   const aiInput = useRef<HTMLInputElement>(null);
   const [confirming, setConfirming] = useState(false);
   const [incident, setIncident] = useState<ReadPhotoResponse["incident"]>(null);
@@ -106,33 +105,6 @@ export default function AlbaranPage() {
       else if (res.backorder_name)
         setMessage(`Validado como entrega parcial. Lo pendiente queda en ${res.backorder_name}.`);
       else setMessage("Albarán validado.");
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Error de conexión");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function sendPhoto(file: File) {
-    if (!picking) return;
-    setError(null);
-    setMessage(null);
-    setBusy("photo");
-    try {
-      let data: string;
-      try {
-        data = await toJpegBase64(file);
-      } catch {
-        throw new ApiError("No se pudo leer la imagen");
-      }
-      const res = await api.post<PickingResponse>(
-        `/api/asistencia/gestion/albaranes/${picking.id}/foto`,
-        { data },
-        token
-      );
-      // Solo se actualiza el contador: recargar el albarán borraría cantidades sin guardar
-      setPicking((prev) => (prev ? { ...prev, photo_count: res.picking.photo_count } : prev));
-      setMessage("Foto adjuntada");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Error de conexión");
     } finally {
@@ -416,24 +388,6 @@ export default function AlbaranPage() {
                 </Button>
               </>
             ) : null}
-            <input
-              ref={photoInput}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                e.target.value = "";
-                if (file) sendPhoto(file);
-              }}
-            />
-            <Button
-              className="bg-slate-700! hover:bg-slate-800! disabled:bg-slate-400!"
-              disabled={busy !== null}
-              onClick={() => photoInput.current?.click()}
-            >
-              {busy === "photo" ? "Subiendo foto…" : "Adjuntar foto"}
-            </Button>
           </>
         ) : null}
 
