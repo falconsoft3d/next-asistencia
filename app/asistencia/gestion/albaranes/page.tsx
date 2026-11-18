@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Card, PageShell, Subtitle, Title, inputClass } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
-import { employeeAuth } from "@/lib/storage";
+import { toJpegBase64 } from "@/lib/photo";
+import { albaranFlash, employeeAuth } from "@/lib/storage";
 import type { PickingSummary, Project } from "@/lib/types";
 
 interface OptionsResponse {
@@ -30,6 +31,16 @@ interface Filter {
   type: PickingType;
   /** Texto a buscar en el número de pedido */
   purchase: string;
+}
+
+interface ExtendResponse {
+  status: "ok";
+  picking_id: number;
+  picking_name: string;
+  supplier_reference: string;
+  matched: number;
+  /** Materiales de la foto que no están en el pedido (no se han añadido) */
+  ignored: string[];
 }
 
 // Se recuerdan el filtro y los pedidos desplegados para no perderlos al volver del detalle
@@ -77,6 +88,7 @@ const STATE_BADGE: Record<string, string> = {
 
 interface PurchaseGroup {
   key: string;
+  purchaseId: number | false;
   purchaseName: string;
   partnerName: string;
   pickings: PickingSummary[];
@@ -92,6 +104,7 @@ function groupByPurchase(pickings: PickingSummary[]): PurchaseGroup[] {
     if (!group) {
       group = {
         key,
+        purchaseId: picking.purchase_id ?? false,
         purchaseName: picking.purchase_name,
         partnerName: picking.purchase_partner_name || picking.partner_name,
         pickings: [],
@@ -177,6 +190,48 @@ export default function AlbaranesPage() {
   const [expanded, setExpanded] = useState<string[]>(readExpanded);
   // Lo que se escribe en el buscador; se aplica al filtro tras una pausa al teclear
   const [purchaseInput, setPurchaseInput] = useState(filter.purchase);
+  // «+» Ampliar pedido: pedido elegido y foto en proceso
+  const extendInput = useRef<HTMLInputElement>(null);
+  const [extendTarget, setExtendTarget] = useState<{ id: number; name: string } | null>(null);
+  const [extending, setExtending] = useState(false);
+
+  function startExtend(id: number, name: string) {
+    setError(null);
+    setExtendTarget({ id, name });
+    extendInput.current?.click();
+  }
+
+  async function extendOrder(file: File) {
+    if (!extendTarget) return;
+    setError(null);
+    setExtending(true);
+    try {
+      let photo: string;
+      try {
+        photo = await toJpegBase64(file);
+      } catch {
+        throw new ApiError("No se pudo leer la imagen");
+      }
+      const res = await api.post<ExtendResponse>(
+        `/api/asistencia/gestion/pedidos/${extendTarget.id}/ampliar`,
+        { photo },
+        token
+      );
+      const ignored = res.ignored?.length
+        ? ` No se han añadido por no estar en el pedido: ${res.ignored.join("; ")}.`
+        : "";
+      albaranFlash.set(
+        `Pedido ${extendTarget.name} ampliado con ${res.matched} ` +
+          `${res.matched === 1 ? "material" : "materiales"} de la foto. Revisa las cantidades y valida.` +
+          ignored
+      );
+      router.push(`/asistencia/gestion/albaranes/${res.picking_id}`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Error de conexión");
+      setExtending(false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
 
   useEffect(() => {
     api
@@ -329,13 +384,16 @@ export default function AlbaranesPage() {
               const isOpen = !!filter.purchase || expanded.includes(key);
               return (
                 <li key={key}>
+                  <div
+                    className={`flex items-center ${
+                      group.allDone ? "bg-green-100 hover:bg-green-200" : "bg-slate-50 hover:bg-slate-100"
+                    }`}
+                  >
                   <button
                     type="button"
                     onClick={() => toggleGroup(key)}
                     aria-expanded={isOpen}
-                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs ${
-                      group.allDone ? "bg-green-100 hover:bg-green-200" : "bg-slate-50 hover:bg-slate-100"
-                    }`}
+                    className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-3 text-left text-xs"
                   >
                     <span
                       aria-hidden
@@ -353,6 +411,21 @@ export default function AlbaranesPage() {
                     </span>
                     <span className="shrink-0 text-slate-400">{group.pickings.length}</span>
                   </button>
+                  {group.purchaseId ? (
+                    <button
+                      type="button"
+                      title="Ampliar pedido con la foto del albarán del proveedor"
+                      aria-label={`Ampliar pedido ${group.purchaseName}`}
+                      disabled={extending}
+                      onClick={() => startExtend(group.purchaseId as number, group.purchaseName)}
+                      className="mx-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xl font-bold leading-none text-blue-600 hover:bg-blue-100 disabled:opacity-40"
+                    >
+                      +
+                    </button>
+                  ) : (
+                    <span className="w-3 shrink-0" />
+                  )}
+                  </div>
                   {isOpen ? (
                     <ul className="divide-y divide-slate-100">
                       {group.pickings.map((picking) => (
@@ -371,10 +444,34 @@ export default function AlbaranesPage() {
           </ul>
         )}
 
+        <input
+          ref={extendInput}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) extendOrder(file);
+          }}
+        />
+
         <Button variant="secondary" onClick={() => router.push("/asistencia/gestion")}>
           Volver
         </Button>
       </Card>
+
+      {extending ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-6">
+          <div className="flex max-w-sm flex-col items-center gap-3 rounded-xl bg-white p-6 text-center shadow-xl">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-violet-600" />
+            <p className="text-sm font-semibold text-slate-800">
+              Leyendo el albarán con IA{extendTarget ? ` · Pedido ${extendTarget.name}` : ""}
+            </p>
+            <p className="text-xs text-slate-500">Se ampliará el pedido y se preparará el albarán de entrada.</p>
+          </div>
+        </div>
+      ) : null}
     </PageShell>
   );
 }

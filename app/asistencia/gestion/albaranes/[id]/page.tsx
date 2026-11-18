@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Card, PageShell, Spinner, Subtitle, Title, inputClass } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { toJpegBase64 } from "@/lib/photo";
-import { employeeAuth } from "@/lib/storage";
+import { albaranFlash, employeeAuth } from "@/lib/storage";
 import type { Picking, PickingDocument } from "@/lib/types";
 
 interface PickingResponse {
@@ -170,7 +170,12 @@ export default function AlbaranPage() {
   useEffect(() => {
     api
       .get<PickingResponse>(`/api/asistencia/gestion/albaranes/${params.id}`, token)
-      .then((res) => load(res.picking))
+      .then((res) => {
+        load(res.picking);
+        // Aviso de «Ampliar pedido» desde la lista
+        const flash = albaranFlash.take();
+        if (flash) setMessage(flash);
+      })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Error de conexión"))
       .finally(() => setLoading(false));
   }, [params.id, token]);

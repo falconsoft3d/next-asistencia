@@ -84,6 +84,8 @@ export interface Picking {
   type_label: string;
   partner_name: string;
   project_name: string;
+  /** Pedido de compra del albarán (false si no tiene) */
+  purchase_id: number | false;
   purchase_name: string;
   purchase_partner_name: string;
   origin: string;

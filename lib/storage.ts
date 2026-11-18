@@ -104,3 +104,25 @@ export const parteDraftPartner = {
     window.sessionStorage.setItem(PARTE_DRAFT_PARTNER_KEY, JSON.stringify(draft)),
   clear: () => window.sessionStorage.removeItem(PARTE_DRAFT_PARTNER_KEY),
 };
+
+// Aviso de un solo uso que muestra el detalle del albarán al abrirse (p. ej. tras ampliar un pedido)
+const ALBARAN_FLASH_KEY = "asistencia_albaran_flash";
+
+export const albaranFlash = {
+  set(message: string) {
+    try {
+      window.sessionStorage.setItem(ALBARAN_FLASH_KEY, message);
+    } catch {
+      // sin almacenamiento solo se pierde el aviso
+    }
+  },
+  take(): string | null {
+    try {
+      const message = window.sessionStorage.getItem(ALBARAN_FLASH_KEY);
+      window.sessionStorage.removeItem(ALBARAN_FLASH_KEY);
+      return message;
+    } catch {
+      return null;
+    }
+  },
+};
