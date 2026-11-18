@@ -65,8 +65,8 @@ function NoteInput({
     <div className="relative w-full">
       <input
         className={inputClass}
-        placeholder="Nota"
-        aria-label="Nota"
+        placeholder="Descripción"
+        aria-label="Descripción"
         autoComplete="off"
         value={value}
         onFocus={() => setOpen(true)}
@@ -108,6 +108,7 @@ export default function SolmatPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState<number | "">("");
   const [lines, setLines] = useState<Line[]>(() => [emptyLine()]);
+  const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [createdName, setCreatedName] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>(() => solmatNotes.get());
@@ -184,7 +185,7 @@ export default function SolmatPage() {
     }
     const filled = lines.filter((l) => l.note.trim());
     if (filled.length === 0) {
-      setError("Añade al menos una línea con nota");
+      setError("Añade al menos una línea con descripción");
       return;
     }
     if (filled.some((l) => !(Number(l.quantity) > 0))) {
@@ -202,6 +203,7 @@ export default function SolmatPage() {
             quantity: Number(l.quantity),
           })),
           photos: photos.map((p) => p.data),
+          notes: notes.trim(),
         },
         token
       );
@@ -226,6 +228,7 @@ export default function SolmatPage() {
           <Button
             onClick={() => {
               setLines([emptyLine()]);
+              setNotes("");
               setPhotos([]);
               setAiInfo(null);
               setCreatedName(null);
@@ -264,7 +267,7 @@ export default function SolmatPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-500">
-                    <th className="py-1 pr-2">Nota</th>
+                    <th className="py-1 pr-2">Descripción</th>
                     <th className="w-24 py-1 pr-2 text-right">Cant.</th>
                     <th className="w-8 py-1" />
                   </tr>
@@ -313,6 +316,17 @@ export default function SolmatPage() {
                 Añadir línea
               </button>
             </div>
+
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-xs font-semibold uppercase text-slate-500">Notas</span>
+              <textarea
+                className={`${inputClass} min-h-20`}
+                rows={3}
+                placeholder="Notas de la solicitud"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </label>
 
             {photos.length > 0 ? (
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
