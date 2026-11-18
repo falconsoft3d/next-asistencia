@@ -6,7 +6,7 @@ import { Alert, Button, Card, PageShell, Spinner, Subtitle, Title, inputClass } 
 import { api, ApiError } from "@/lib/api";
 import { toJpegBase64 } from "@/lib/photo";
 import { employeeAuth } from "@/lib/storage";
-import type { Picking } from "@/lib/types";
+import type { Picking, PickingDocument } from "@/lib/types";
 
 interface PickingResponse {
   status: "ok";
@@ -49,6 +49,95 @@ function todayLocal() {
 
 function quantitiesOf(picking: Picking): Record<number, string> {
   return Object.fromEntries(picking.lines.map((l) => [l.id, String(l.quantity)]));
+}
+
+// El documento se pide con el token (un <img src> o <a href> directo no puede enviarlo)
+function DocumentTile({
+  pickingId,
+  doc,
+  token,
+}: {
+  pickingId: number;
+  doc: PickingDocument;
+  token: string | null;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const isImage = doc.mimetype.startsWith("image/");
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    let cancelled = false;
+    api
+      .blob(`/api/asistencia/gestion/albaranes/${pickingId}/documentos/${doc.id}`, token)
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      })
+      .catch(() => !cancelled && setFailed(true));
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [pickingId, doc.id, token]);
+
+  const extension = doc.name.includes(".") ? doc.name.split(".").pop()!.toUpperCase() : "DOC";
+
+  return (
+    <a
+      href={url ?? undefined}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={doc.name}
+      className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-xs"
+    >
+      <div className="flex aspect-square items-center justify-center text-slate-400">
+        {failed ? (
+          "No disponible"
+        ) : !url ? (
+          "Cargando…"
+        ) : isImage ? (
+          // eslint-disable-next-line @next/next/no-img-element -- imagen privada cargada como blob
+          <img src={url} alt={doc.name} className="h-full w-full object-cover" />
+        ) : (
+          <span className="rounded bg-slate-200 px-2 py-1 font-semibold text-slate-600">{extension}</span>
+        )}
+      </div>
+      <div className="truncate border-t border-slate-200 bg-white px-2 py-1 text-slate-600">{doc.name}</div>
+    </a>
+  );
+}
+
+function DocumentList({
+  pickingId,
+  documents,
+  token,
+}: {
+  pickingId: number;
+  documents: PickingDocument[];
+  token: string | null;
+}) {
+  if (!documents.length) return null;
+  const groups = [
+    { label: "Documentos del albarán", items: documents.filter((d) => d.source === "albaran") },
+    { label: "Documentos del pedido de compra", items: documents.filter((d) => d.source === "pedido") },
+  ].filter((g) => g.items.length);
+
+  return (
+    <div className="flex flex-col gap-3">
+      {groups.map((group) => (
+        <div key={group.label} className="flex flex-col gap-2">
+          <p className="text-xs font-semibold uppercase text-slate-500">{group.label}</p>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {group.items.map((doc) => (
+              <DocumentTile key={doc.id} pickingId={pickingId} doc={doc} token={token} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function AlbaranPage() {
@@ -133,7 +222,9 @@ export default function AlbaranPage() {
         token
       );
       // Solo se actualiza el contador de fotos: recargar borraría cantidades sin guardar
-      setPicking((prev) => (prev ? { ...prev, photo_count: res.picking.photo_count } : prev));
+      setPicking((prev) =>
+        prev ? { ...prev, photo_count: res.picking.photo_count, documents: res.picking.documents } : prev
+      );
       if (res.incident) setIncident(res.incident);
       if (res.ai_error && !res.lines.length) {
         setError(`La foto se ha adjuntado, pero no se pudo leer con IA: ${res.ai_error}`);
@@ -174,7 +265,7 @@ export default function AlbaranPage() {
   const partial = !!picking && picking.lines.some((l) => Number(quantities[l.id] || 0) < l.demand);
   const missing = [
     supplierRef.trim() ? null : "la referencia del proveedor",
-    picking && picking.photo_count > 0 ? null : "una foto",
+    picking && picking.photo_count > 0 ? null : "una foto o documento",
   ].filter(Boolean);
 
   return (
@@ -228,7 +319,7 @@ export default function AlbaranPage() {
                   fmtDate(picking.scheduled_date)
                 )}
               </dd>
-              <dt className="text-slate-500">Fotos adjuntas</dt>
+              <dt className="text-slate-500">Documentos adjuntos</dt>
               <dd className="text-slate-800">{picking.photo_count}</dd>
               <dt className="text-slate-500">Ref. proveedor</dt>
               <dd className="text-slate-800">
@@ -245,6 +336,8 @@ export default function AlbaranPage() {
                 )}
               </dd>
             </dl>
+
+            <DocumentList pickingId={picking.id} documents={picking.documents ?? []} token={token} />
 
             <table className="w-full text-sm">
               <thead>

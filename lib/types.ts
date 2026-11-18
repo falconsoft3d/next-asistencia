@@ -93,11 +93,21 @@ export interface Picking {
   editable: boolean;
   supplier_reference: string;
   line_count: number;
+  /** Documentos adjuntos al albarán (fotos, PDF...): para validar hace falta al menos uno */
   photo_count: number;
+  documents: PickingDocument[];
   lines: PickingLine[];
 }
 
-export type PickingSummary = Omit<Picking, "lines" | "photo_count">;
+export interface PickingDocument {
+  id: number;
+  name: string;
+  mimetype: string;
+  /** albaran: adjunto al albarán · pedido: adjunto al pedido de compra */
+  source: "albaran" | "pedido";
+}
+
+export type PickingSummary = Omit<Picking, "lines" | "photo_count" | "documents">;
 
 export interface PartnerAttendance {
   id: number;
