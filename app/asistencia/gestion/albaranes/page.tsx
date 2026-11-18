@@ -131,6 +131,15 @@ function PickingRow({ picking }: { picking: PickingSummary }) {
           >
             {picking.state_label}
           </span>
+          {picking.type === "outgoing" && picking.collected !== null ? (
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                picking.collected ? "bg-green-100 text-green-800" : "bg-red-100 text-red-700"
+              }`}
+            >
+              Recogido: {picking.collected ? "Sí" : "No"}
+            </span>
+          ) : null}
         </div>
         {picking.supplier_reference ? (
           <p className="truncate text-xs font-medium text-slate-700">Ref. proveedor: {picking.supplier_reference}</p>
