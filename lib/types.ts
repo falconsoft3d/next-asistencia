@@ -93,6 +93,8 @@ export interface Picking {
   editable: boolean;
   supplier_reference: string;
   line_count: number;
+  /** «Recogido» de las devoluciones (null si el campo no existe en Odoo) */
+  collected: boolean | null;
   /** Documentos adjuntos al albarán (fotos, PDF...): para validar hace falta al menos uno */
   photo_count: number;
   documents: PickingDocument[];

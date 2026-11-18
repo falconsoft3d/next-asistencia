@@ -153,6 +153,7 @@ export default function AlbaranPage() {
   const [supplierRef, setSupplierRef] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
   const [quantities, setQuantities] = useState<Record<number, string>>({});
+  const [collected, setCollected] = useState(false);
   const [busy, setBusy] = useState<"save" | "validate" | "ai" | null>(null);
   const aiInput = useRef<HTMLInputElement>(null);
   const [confirming, setConfirming] = useState(false);
@@ -163,6 +164,7 @@ export default function AlbaranPage() {
     setSupplierRef(next.supplier_reference);
     setScheduledDate(next.scheduled_date ? next.scheduled_date.slice(0, 10) : "");
     setQuantities(quantitiesOf(next));
+    setCollected(!!next.collected);
   }
 
   useEffect(() => {
@@ -172,6 +174,10 @@ export default function AlbaranPage() {
       .catch((err) => setError(err instanceof ApiError ? err.message : "Error de conexión"))
       .finally(() => setLoading(false));
   }, [params.id, token]);
+
+  // Las devoluciones (OUT) no se validan desde la app: se marcan como «Recogido»
+  const isReturn = picking?.type === "outgoing";
+  const showCollected = isReturn && picking?.collected !== null;
 
   async function send(validate: boolean) {
     if (!picking) return;
@@ -186,6 +192,7 @@ export default function AlbaranPage() {
           supplier_reference: supplierRef,
           scheduled_date: scheduledDate,
           lines: picking.lines.map((l) => ({ id: l.id, quantity: Number(quantities[l.id] || 0) })),
+          ...(isReturn ? { collected } : {}),
         },
         token
       );
@@ -335,6 +342,28 @@ export default function AlbaranPage() {
                   picking.supplier_reference || "—"
                 )}
               </dd>
+              {showCollected ? (
+                <>
+                  <dt className="text-slate-500">Recogido</dt>
+                  <dd className="text-slate-800">
+                    {picking.editable ? (
+                      <label className="inline-flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="h-5 w-5 accent-blue-600"
+                          checked={collected}
+                          onChange={(e) => setCollected(e.target.checked)}
+                        />
+                        <span>{collected ? "Sí" : "No"}</span>
+                      </label>
+                    ) : picking.collected ? (
+                      "Sí"
+                    ) : (
+                      "No"
+                    )}
+                  </dd>
+                </>
+              ) : null}
             </dl>
 
             <DocumentList pickingId={picking.id} documents={picking.documents ?? []} token={token} />
@@ -436,6 +465,10 @@ export default function AlbaranPage() {
                 </Button>
               </div>
             </>
+          ) : isReturn ? (
+            <Button disabled={busy !== null} onClick={() => send(false)}>
+              {busy === "save" ? "Guardando…" : "Guardar"}
+            </Button>
           ) : (
             <div className="grid grid-cols-2 gap-2">
               <Button disabled={busy !== null} onClick={() => send(false)}>
